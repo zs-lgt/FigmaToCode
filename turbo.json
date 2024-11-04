@@ -1,9 +1,17 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "pipeline": {
+  "tasks": {
     "build": {
       "outputs": [".next/**", "!.next/cache/**"]
     },
-    "type-check": {}
+    "build:watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "type-check": {},
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
   }
 }

@@ -1,5 +1,7 @@
 {
+  "name": "create-x",
   "private": true,
+  "packageManager": "pnpm@9.1.0",
   "scripts": {
     "build": "turbo run build",
     "build:watch": "turbo run build:watch",

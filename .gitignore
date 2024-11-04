@@ -29,3 +29,5 @@ test/**/next-env.d.ts
 
 build
 .turbo
+
+.history
