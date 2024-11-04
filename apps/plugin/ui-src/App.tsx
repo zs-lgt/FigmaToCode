@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FrameworkTypes, PluginSettings, PluginUI } from "plugin-ui";
+import { log } from "util";
 
 interface AppState {
   code: string;
@@ -37,8 +38,39 @@ export default function App() {
     .trim();
 
   useEffect(() => {
-    window.onmessage = (event: MessageEvent) => {
+    window.onmessage = async (event: MessageEvent) => {
       const message = event.data.pluginMessage;
+      if (event.data.pluginMessage.type === 'upload-image') {
+        try {
+          console.log('base64Image:', event.data.pluginMessage.base64Image);
+          // 从 base64 字符串中提取实际的 base64 数据
+          const base64Data = event.data.pluginMessage.base64Image.split(',')[1];
+          // 将 base64 转换为二进制数据
+          const binaryData = atob(base64Data);
+          const byteArray = new Uint8Array(binaryData.length);
+          for (let i = 0; i < binaryData.length; i++) {
+            byteArray[i] = binaryData.charCodeAt(i);
+          }
+          const blob = new Blob([byteArray], { type: 'image/png' });
+          const file = new File([blob], 'image.png', { type: 'image/png' });
+          // 创建 FormData
+          const formData = new FormData();
+          formData.append('file', file);
+          // 图片上传
+          const response = await fetch('https://appstore.10jqka.com.cn/open_platform/program/v1/upload', {
+            method: 'POST',
+            body: formData
+          });
+          
+          const data = await response.json();
+          console.log('上传响应:', data);
+          const imageUrl = data.data.code_url;
+          console.log('上传成功，图片链接：', imageUrl);
+        } catch (error) {
+          console.error('上传失败:', error);
+        }
+      }
+
       console.log("[ui] message received hha:", message);
       switch (message.type) {
         case "code":

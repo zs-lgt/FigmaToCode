@@ -41,9 +41,33 @@ const tailwindWidgetGenerator = (
   const visibleSceneNode = sceneNode.filter((d) => d.visible);
   
   visibleSceneNode.forEach((node) => {
+    console.log(123,node.name, node.type, node);
+    
     switch (node.type) {
       case "RECTANGLE":
       case "ELLIPSE":
+        if (node.isAsset) {
+          node.fills.forEach(async (fill) => {
+            if (fill.type === "IMAGE") {
+              const imageHash = fill.imageHash;
+              const imgFile = figma.getImageByHash(imageHash);
+              try {
+                // 获取图片的二进制数据
+                const imageBytes = await imgFile.getBytesAsync();
+                // 将图片二进制文件转成base64 格式
+                const base64Image = `data:image/png;base64,${figma.base64Encode(imageBytes)}`;
+                console.log('base64Image:', base64Image);
+                // 发送消息到 UI 层处理网络请求
+                figma.ui.postMessage({
+                  type: 'upload-image',
+                  base64Image: base64Image
+                });
+              } catch (error) {
+                console.error('图片处理失败:', error);
+              }
+            }
+          });
+        }
         comp += tailwindContainer(node, "", "", isJsx);
         break;
       case "GROUP":
