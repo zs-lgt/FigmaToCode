@@ -1,8 +1,13 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "pipeline": {
+  "tasks": {
     "build": {
       "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "build:watch": {
+      "outputs": [".next/**", "!.next/cache/**"],
+      "persistent": true,
+      "cache": false
     },
     "type-check": {}
   }

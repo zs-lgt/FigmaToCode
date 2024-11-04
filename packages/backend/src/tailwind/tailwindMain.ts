@@ -30,15 +30,16 @@ export const tailwindMain = (
   return result;
 };
 
-// todo lint idea: replace BorderRadius.only(topleft: 8, topRight: 8) with BorderRadius.horizontal(8)
+// todo：代码检查想法：将 BorderRadius.only(topleft: 8, topRight: 8) 替换为 BorderRadius.horizontal(8)
 const tailwindWidgetGenerator = (
   sceneNode: ReadonlyArray<SceneNode>,
   isJsx: boolean
 ): string => {
   let comp = "";
 
-  // filter non visible nodes. This is necessary at this step because conversion already happened.
+  // 过滤不可见节点。这一步是必要的，因为转换已经发生。
   const visibleSceneNode = sceneNode.filter((d) => d.visible);
+  
   visibleSceneNode.forEach((node) => {
     switch (node.type) {
       case "RECTANGLE":
@@ -72,10 +73,10 @@ const tailwindWidgetGenerator = (
 };
 
 const tailwindGroup = (node: GroupNode, isJsx: boolean = false): string => {
-  // ignore the view when size is zero or less
-  // while technically it shouldn't get less than 0, due to rounding errors,
-  // it can get to values like: -0.000004196293048153166
-  // also ignore if there are no children inside, which makes no sense
+  // 当尺寸为零或更小时忽略视图
+  // 虽然技术上不应该小于0，但由于舍入误差，
+  // 它可能会得到类似：-0.000004196293048153166 的值
+  // 同时如果内部没有子元素，这也没有意义，所以也要忽略
   if (node.width < 0 || node.height <= 0 || node.children.length === 0) {
     return "";
   }
@@ -161,8 +162,8 @@ const tailwindFrame = (
   }
 };
 
-// properties named propSomething always take care of ","
-// sometimes a property might not exist, so it doesn't add ","
+// 名称为 propSomething 的属性始终处理 ","
+// 有时属性可能不存在，所以不添加 ","
 export const tailwindContainer = (
   node: SceneNode &
     SceneNodeMixin &
@@ -254,7 +255,7 @@ export const tailwindCodeGenTextStyles = () => {
     .join("\n---\n");
 
   if (!result) {
-    return "// No text styles in this selection";
+    return "// 此选择中没有文本样式";
   }
 
   return result;

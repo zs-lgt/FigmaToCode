@@ -39,7 +39,7 @@ export default function App() {
   useEffect(() => {
     window.onmessage = (event: MessageEvent) => {
       const message = event.data.pluginMessage;
-      console.log("[ui] message received:", message);
+      console.log("[ui] message received hha:", message);
       switch (message.type) {
         case "code":
           setState((prevState) => ({

@@ -369,9 +369,7 @@ export const CodePanel = (props: {
                         key={option.label}
                         title={option.label}
                         isSelected={
-                          option.value ===
-                            props.preferences?.[preference.propertyName] ??
-                          option.isDefault
+                          option.value === props.preferences?.[preference.propertyName] || option.isDefault
                         }
                         onSelect={() => {
                           props.onPreferenceChange(
