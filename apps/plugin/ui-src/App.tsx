@@ -66,6 +66,13 @@ export default function App() {
           console.log('上传响应:', data);
           const imageUrl = data.data.code_url;
           console.log('上传成功，图片链接：', imageUrl);
+          // 将URL发送回主线程
+          parent.postMessage({
+            pluginMessage: {
+              type: 'upload-image-complete',
+              imageUrl: imageUrl
+            }
+          }, '*');
         } catch (error) {
           console.error('上传失败:', error);
         }

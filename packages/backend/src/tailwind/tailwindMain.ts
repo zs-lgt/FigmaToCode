@@ -13,6 +13,9 @@ let previousExecutionCache: { style: string; text: string }[];
 
 const selfClosingTags = ["img"];
 
+// 在文件顶部添加一个 Promise 来处理异步的图片上传
+let imageUploadPromise: Promise<string>;
+
 export const tailwindMain = (
   sceneNode: Array<SceneNode>,
   settings: PluginSettings
@@ -58,10 +61,28 @@ const tailwindWidgetGenerator = (
                 const base64Image = `data:image/png;base64,${figma.base64Encode(imageBytes)}`;
                 console.log('base64Image:', base64Image);
                 // 发送消息到 UI 层处理网络请求
-                figma.ui.postMessage({
-                  type: 'upload-image',
-                  base64Image: base64Image
+                // 创建一个新的 Promise 来等待上传结果
+                imageUploadPromise = new Promise((resolve) => {
+                  // 监听来自 UI 的消息
+                  figma.ui.onmessage = (msg) => {
+                    console.log('msg:', msg);
+                    if (msg.type === 'upload-image-complete') {
+                      resolve(msg.imageUrl);
+                    }
+                  };
+                  
+                  // 发送消息到 UI
+                  figma.ui.postMessage({
+                    type: 'upload-image',
+                    base64Image: base64Image
+                  });
                 });
+                
+                // 等待上传完成并获取URL
+                const imageUrl = await imageUploadPromise;
+                // 使用返回的图片URL更新组件
+                console.log('final imageUrl:', imageUrl);
+                // builder.addAttributes(`bg-[url(${imageUrl})]`);
               } catch (error) {
                 console.error('图片处理失败:', error);
               }
@@ -202,6 +223,8 @@ export const tailwindContainer = (
   // ignore the view when size is zero or less
   // while technically it shouldn't get less than 0, due to rounding errors,
   // it can get to values like: -0.000004196293048153166
+  console.log('node:', node);
+  
   if (node.width < 0 || node.height < 0) {
     return children;
   }
@@ -213,9 +236,10 @@ export const tailwindContainer = (
   if (builder.attributes || additionalAttr) {
     const build = builder.build(additionalAttr);
 
-    // image fill and no children -- let's emit an <img />
+    // 如果node是img，则不添加bg-[url()]属性
     let tag = "div";
     let src = "";
+    // 如果node的fills是image，则将tag设置为img，并设置src
     if (retrieveTopFill(node.fills)?.type === "IMAGE") {
       if (!("children" in node) || node.children.length === 0) {
         tag = "img";
@@ -232,10 +256,15 @@ export const tailwindContainer = (
     }
 
     if (children) {
+      console.log('children1:', children);
       return `\n<${tag}${build}${src}>${indentString(children)}\n</${tag}>`;
     } else if (selfClosingTags.includes(tag) || isJsx) {
+      console.log('children2:', children);
+
       return `\n<${tag}${build}${src} />`;
     } else {
+      console.log('children3:', children);
+
       return `\n<${tag}${build}${src}></${tag}>`;
     }
   }
