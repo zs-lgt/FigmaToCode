@@ -36,51 +36,71 @@ export default function App() {
   const figmaColorBgValue = rootStyles
     .getPropertyValue("--figma-color-bg")
     .trim();
-
+  let img = ''
   useEffect(() => {
     window.onmessage = async (event: MessageEvent) => {
       const message = event.data.pluginMessage;
-      if (event.data.pluginMessage.type === 'upload-image') {
-        try {
-          console.log('base64Image:', event.data.pluginMessage.base64Image);
-          // 从 base64 字符串中提取实际的 base64 数据
-          const base64Data = event.data.pluginMessage.base64Image.split(',')[1];
-          // 将 base64 转换为二进制数据
-          const binaryData = atob(base64Data);
-          const byteArray = new Uint8Array(binaryData.length);
-          for (let i = 0; i < binaryData.length; i++) {
-            byteArray[i] = binaryData.charCodeAt(i);
-          }
-          const blob = new Blob([byteArray], { type: 'image/png' });
-          const file = new File([blob], 'image.png', { type: 'image/png' });
-          // 创建 FormData
-          const formData = new FormData();
-          formData.append('file', file);
-          // 图片上传
-          const response = await fetch('https://appstore.10jqka.com.cn/open_platform/program/v1/upload', {
-            method: 'POST',
-            body: formData
-          });
-          
-          const data = await response.json();
-          console.log('上传响应:', data);
-          const imageUrl = data.data.code_url;
-          console.log('上传成功，图片链接：', imageUrl);
-          // 将URL发送回主线程
-          parent.postMessage({
-            pluginMessage: {
-              type: 'upload-image-complete',
-              imageUrl: imageUrl
-            }
-          }, '*');
-        } catch (error) {
-          console.error('上传失败:', error);
-        }
-      }
-
       console.log("[ui] message received hha:", message);
       switch (message.type) {
+        case "upload-image":
+          try {
+            // 从 base64 字符串中提取实际的 base64 数据
+            const base64Data = event.data.pluginMessage.base64Image.split(',')[1];
+            // 将 base64 转换为二进制数据
+            const binaryData = atob(base64Data);
+            const byteArray = new Uint8Array(binaryData.length);
+            for (let i = 0; i < binaryData.length; i++) {
+              byteArray[i] = binaryData.charCodeAt(i);
+            }
+            const blob = new Blob([byteArray], { type: 'image/png' });
+            const file = new File([blob], 'image.png', { type: 'image/png' });
+            // 创建 FormData
+            const formData = new FormData();
+            formData.append('file', file);
+            // 图片上传
+            const response = await fetch('https://appstore.10jqka.com.cn/open_platform/program/v1/upload', {
+              method: 'POST',
+              body: formData
+            });
+            
+            const data = await response.json();
+            console.log('上传响应:', data);
+            const imageUrl = data.data.code_url;
+            img = imageUrl;
+            console.log('上传成功，图片链接：', imageUrl);
+  
+            // 将URL发送回主线程
+            parent.postMessage({
+              pluginMessage: {
+                type: 'upload-image-complete',
+                imageUrl: imageUrl
+              }
+            }, '*');
+            setState((prevState) => {
+              // 匹配自闭合标签和普通标签
+              const regex = new RegExp(`<([^>]*)id="${message.nodeId}"([^>]*?)(?:>.*?</[^>]*>|/>)`, 'g');
+              const codeText = prevState.code.replace(
+                regex,
+                (match, group1, group2) => {
+                  // 提取 className 和其他属性
+                  const classMatch = (group1 + group2).match(/className="([^"]*)"/) || [];
+                  const className = classMatch[1] || '';
+                  
+                  return `<img id="${message.nodeId}" src="${imageUrl}" className="${className}" />`;
+                }
+              );
+              console.log('替换后的代码:', codeText);
+              return {
+                ...prevState,
+                code: codeText
+              }
+            });
+          } catch (error) {
+            console.error('上传失败:', error);
+          }
+          break;
         case "code":
+          console.log('message.data:', message.data, img);
           setState((prevState) => ({
             ...prevState,
             code: message.data,

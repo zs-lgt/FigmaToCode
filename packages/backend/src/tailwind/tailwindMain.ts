@@ -59,13 +59,11 @@ const tailwindWidgetGenerator = (
                 const imageBytes = await imgFile.getBytesAsync();
                 // 将图片二进制文件转成base64 格式
                 const base64Image = `data:image/png;base64,${figma.base64Encode(imageBytes)}`;
-                console.log('base64Image:', base64Image);
                 // 发送消息到 UI 层处理网络请求
                 // 创建一个新的 Promise 来等待上传结果
                 imageUploadPromise = new Promise((resolve) => {
                   // 监听来自 UI 的消息
                   figma.ui.onmessage = (msg) => {
-                    console.log('msg:', msg);
                     if (msg.type === 'upload-image-complete') {
                       resolve(msg.imageUrl);
                     }
@@ -74,7 +72,8 @@ const tailwindWidgetGenerator = (
                   // 发送消息到 UI
                   figma.ui.postMessage({
                     type: 'upload-image',
-                    base64Image: base64Image
+                    base64Image: base64Image,
+                    nodeId: node.id,
                   });
                 });
                 
@@ -260,8 +259,7 @@ export const tailwindContainer = (
       return `\n<${tag}${build}${src}>${indentString(children)}\n</${tag}>`;
     } else if (selfClosingTags.includes(tag) || isJsx) {
       console.log('children2:', children);
-
-      return `\n<${tag}${build}${src} />`;
+      return `\n<${tag} id="${node.id}"${build}${src} />`;
     } else {
       console.log('children3:', children);
 
