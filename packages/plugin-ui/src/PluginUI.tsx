@@ -47,7 +47,7 @@ export const PluginUI = (props: PluginUIProps) => {
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
-        {["HTML", "Tailwind", "Flutter", "SwiftUI"].map((tab) => (
+        {["HTML", "Tailwind"].map((tab) => (
           <button
             key={`tab ${tab}`}
             className={`w-full p-1 text-sm ${
@@ -175,14 +175,15 @@ export const preferenceOptions: LocalCodegenPreference[] = [
     propertyName: "jsx",
     label: "React (JSX)",
     description: 'Render "class" attributes as "className"',
-    isDefault: false,
+    isDefault: true,
     includedLanguages: ["HTML", "Tailwind"],
   },
   // {
   //   itemType: "individual_select",
   //   propertyName: "inlineStyle",
-  //   label: "Inline Style",
-  //   isDefault: true,
+  //   label: "内联样式",
+  //   description: 'Inline style',
+  //   isDefault: false,
   //   includedLanguages: ["HTML"],
   // },
   // {
@@ -195,43 +196,51 @@ export const preferenceOptions: LocalCodegenPreference[] = [
   {
     itemType: "individual_select",
     propertyName: "optimizeLayout",
-    label: "Optimize layout",
+    label: "优化布局",
     description: 'Attempt to auto-layout suitable element groups',
     isDefault: true,
     includedLanguages: ["HTML", "Tailwind", "Flutter", "SwiftUI"],
   },
-  {
-    itemType: "individual_select",
-    propertyName: "layerName",
-    label: "Layer names",
-    description: 'Include layer names in classes',
-    isDefault: false,
-    includedLanguages: ["HTML", "Tailwind"],
-  },
-  {
-    itemType: "individual_select",
-    propertyName: "roundTailwindValues",
-    label: "Round values",
-    description: 'Round pixel values to nearest Tailwind sizes',
-    isDefault: false,
-    includedLanguages: ["Tailwind"],
-  },
-  {
-    itemType: "individual_select",
-    propertyName: "roundTailwindColors",
-    label: "Round colors",
-    description: 'Round color values to nearest Tailwind colors',
-    isDefault: false,
-    includedLanguages: ["Tailwind"],
-  },
+  // {
+  //   itemType: "individual_select",
+  //   propertyName: "layerName",
+  //   label: "Layer names",
+  //   description: 'Include layer names in classes',
+  //   isDefault: false,
+  //   includedLanguages: ["HTML", "Tailwind"],
+  // },
+  // {
+  //   itemType: "individual_select",
+  //   propertyName: "roundTailwindValues",
+  //   label: "Round values",
+  //   description: 'Round pixel values to nearest Tailwind sizes',
+  //   isDefault: false,
+  //   includedLanguages: ["Tailwind"],
+  // },
+  // {
+  //   itemType: "individual_select",
+  //   propertyName: "roundTailwindColors",
+  //   label: "Round colors",
+  //   description: 'Round color values to nearest Tailwind colors',
+  //   isDefault: false,
+  //   includedLanguages: ["Tailwind"],
+  // },
+  // {
+  //   itemType: "individual_select",
+  //   propertyName: "customTailwindColors",
+  //   label: "Custom colors",
+  //   description: 'Use color variable names as custom color names',
+  //   isDefault: false,
+  //   includedLanguages: ["Tailwind"],
+  // },
   {
     itemType: "individual_select",
     propertyName: "customTailwindColors",
-    label: "Custom colors",
-    description: 'Use color variable names as custom color names',
-    isDefault: false,
-    includedLanguages: ["Tailwind"],
-  },
+    label: "自适应黑白",
+    description: 'Include layer names in classes',
+    isDefault: true,
+    includedLanguages: ["HTML", "Tailwind"],
+  }
   // Add your preferences data here
 ];
 
@@ -290,7 +299,8 @@ export const CodePanel = (props: {
   const handleButtonClick = () => {
     setIsPressed(true);
     setTimeout(() => setIsPressed(false), 250);
-    copy(props.code);
+    copy(`create-x\`\`\`${props.code}\`\`\``);
+    window.open("http://localhost:3001", "_blank");
   };
 
   const handleButtonHover = () => setSyntaxHovered(true);
@@ -299,8 +309,8 @@ export const CodePanel = (props: {
   if (emptySelection) {
     return (
       <div className="flex flex-col space-y-2 m-auto items-center justify-center p-4 {sectionStyle}">
-        <p className="text-lg font-bold">Nothing is selected</p>
-        <p className="text-xs">Try selecting a layer, any layer</p>
+        <p className="text-lg font-bold">未选中任何图层</p>
+        <p className="text-xs">请选中一个图层</p>
       </div>
     );
   } else {
@@ -313,7 +323,7 @@ export const CodePanel = (props: {
       <div className="w-full flex flex-col gap-2 mt-2">
         <div className="flex items-center justify-between w-full">
           <p className="text-lg font-medium text-center dark:text-white rounded-lg">
-            Code
+            代码预览
           </p>
           <button
             className={`px-4 py-1 text-sm font-semibold border border-green-500 rounded-md shadow-sm hover:bg-green-500 dark:hover:bg-green-600 hover:text-white hover:border-transparent transition-all duration-300 ${
@@ -325,7 +335,7 @@ export const CodePanel = (props: {
             onMouseEnter={handleButtonHover}
             onMouseLeave={handleButtonLeave}
           >
-            Copy
+            导出到KAmis
           </button>
         </div>
 
@@ -629,7 +639,7 @@ export const Preview: React.FC<{
   return (
     <div className="flex flex-col w-full">
       <div className="py-1.5 flex gap-2 w-full text-lg font-medium text-center dark:text-white rounded-lg justify-between">
-        <span>Responsive Preview</span>
+        <span>预览</span>
         <button
           className={`px-2 py-1 text-sm font-semibold border border-green-500 rounded-md shadow-sm hover:bg-green-500 dark:hover:bg-green-600 hover:text-white hover:border-transparent transition-all duration-300 ${"bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 border-neutral-300 dark:border-neutral-600"}`}
           onClick={() => {
