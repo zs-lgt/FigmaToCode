@@ -1,7 +1,7 @@
 {
+  "name": "create-x",
   "private": true,
   "packageManager": "pnpm@8.15.4",
-  "name": "figma-to-code",
   "scripts": {
     "build": "turbo run build",
     "build:watch": "turbo run build:watch",
