@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { coldarkDark as theme } from "react-syntax-highlighter/dist/esm/styles/prism";
-import copy from "copy-to-clipboard";
+import copy from "copy-to-clipboard"
+import classNames from "classnames";;
 
 export type FrameworkTypes = "HTML" | "Tailwind" | "Flutter" | "SwiftUI";
 
@@ -78,7 +79,10 @@ export const PluginUI = (props: PluginUIProps) => {
 
           {props.htmlPreview && (
             <Preview
-              htmlPreview={props.htmlPreview}
+              htmlPreview={{
+                content: props.code,
+                device: 'mobile',
+              }}
               isResponsiveExpanded={isResponsiveExpanded}
               setIsResponsiveExpanded={setIsResponsiveExpanded}
             />
@@ -198,7 +202,7 @@ export const preferenceOptions: LocalCodegenPreference[] = [
     propertyName: "optimizeLayout",
     label: "优化布局",
     description: 'Attempt to auto-layout suitable element groups',
-    isDefault: true,
+    isDefault: false,
     includedLanguages: ["HTML", "Tailwind", "Flutter", "SwiftUI"],
   },
   // {
@@ -238,7 +242,7 @@ export const preferenceOptions: LocalCodegenPreference[] = [
     propertyName: "customTailwindColors",
     label: "自适应黑白",
     description: 'Include layer names in classes',
-    isDefault: true,
+    isDefault: false,
     includedLanguages: ["HTML", "Tailwind"],
   }
   // Add your preferences data here
@@ -625,7 +629,7 @@ const SelectableToggle = ({
 
 export const Preview: React.FC<{
   htmlPreview: {
-    size: { width: number; height: number };
+    device: "desktop" | "mobile";
     content: string;
   };
   isResponsiveExpanded: boolean;
@@ -633,6 +637,55 @@ export const Preview: React.FC<{
 }> = (props) => {
   const previewWidths = [45, 80, 140];
   const labels = ["sm", "md", "lg"];
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const reactCodeWrapper = () => {
+    console.log("reactCodeWrapper", props.htmlPreview.content);
+
+    // class的特殊字符转义
+    
+    return `<!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>React with CDN</title>
+        <!-- 引入Tailwind CSS -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body>
+          <div id="root"></div>
+
+          <!-- 引入React -->
+          <script crossorigin src="https://cdn.jsdelivr.net/npm/react@17.0.2/umd/react.production.min.js"></script>
+          <!-- 引入ReactDOM -->
+          <script crossorigin src="https://cdn.jsdelivr.net/npm/react-dom@17.0.2/umd/react-dom.production.min.js"></script>
+
+          <!-- 引入Babel -->
+          <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+          <!-- 你的JS代码 -->
+          <script type="text/babel">
+            const App = () => {
+              return (
+  ${props.htmlPreview.content}
+              )
+            }
+            ReactDOM.render(<App />, document.getElementById('root'));
+          </script>
+        </body>
+      </html>`;
+  };
+
+  useEffect(() => {
+    if (iframeRef.current) {
+      const doc = iframeRef.current.contentDocument;
+      if (doc) {
+        doc.open();
+        doc.write(reactCodeWrapper());
+        doc.close();
+      }
+    }
+  }, [props.htmlPreview.content]);
 
   return (
     <div className="flex flex-col w-full">
@@ -648,27 +701,20 @@ export const Preview: React.FC<{
         </button>
       </div>
       <div className="flex gap-2 justify-center items-center">
-        {previewWidths.map((targetWidth, index) => {
-          const targetHeight = props.isResponsiveExpanded ? 260 : 120;
-          const scaleFactor = Math.min(
-            targetWidth / props.htmlPreview.size.width,
-            targetHeight / props.htmlPreview.size.height
-          );
-          return (
             <div
-              key={"preview " + index}
+              key={"preview "}
               className="relative flex flex-col items-center"
-              style={{ width: targetWidth }}
+              style={{ width: 375 }}
             >
               <div
-                className="flex flex-col justify-center items-center border border-neutral-200 dark:border-neutral-700 rounded-md shadow-sm"
+                className="flex flex-col justify-center items-center"
                 style={{
-                  width: targetWidth,
-                  height: targetHeight,
+                  width: 375,
+                  height: 750,
                   clipPath: "inset(0px round 6px)",
                 }}
               >
-                <div
+                {/* <div
                   style={{
                     zoom: scaleFactor,
                     width: "100%",
@@ -678,14 +724,28 @@ export const Preview: React.FC<{
                   dangerouslySetInnerHTML={{
                     __html: props.htmlPreview.content,
                   }}
-                />
+                /> */}
+                <iframe
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                  }}
+                  ref={iframeRef}
+                  title="preview"
+                  className={classNames(
+                    "border-[4px] border-black rounded-[20px] shadow-lg",
+                    "transform scale-[0.9] origin-top",
+                    {
+                      "w-full h-[832px]": props.htmlPreview.device === "desktop",
+                      "w-[400px] h-[832px]": props.htmlPreview.device === "mobile",
+                  }
+                )}
+                ></iframe>
               </div>
-              <span className="mt-auto text-xs text-gray-500">
-                {labels[index]}
-              </span>
+              {/* <span className="mt-auto text-xs text-gray-500">
+                {labels}
+              </span> */}
             </div>
-          );
-        })}
       </div>
     </div>
   );

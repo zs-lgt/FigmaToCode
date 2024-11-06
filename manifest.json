@@ -8,7 +8,7 @@
   "capabilities": ["inspect", "codegen", "vscode"],
   "permissions": [],
   "networkAccess": {
-    "allowedDomains": ["https://appstore.10jqka.com.cn"]
+    "allowedDomains": ["https://via.placeholder.com", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://appstore.10jqka.com.cn", "https://s.thsi.cn", "https://cdn.tailwindcss.com"]
   },
   "codegenLanguages": [
     { "label": "HTML", "value": "html" },

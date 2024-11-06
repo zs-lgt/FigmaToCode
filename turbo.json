@@ -9,6 +9,10 @@
       "persistent": true,
       "cache": false
     },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
     "type-check": {}
   }
 }

@@ -52,7 +52,7 @@ export const run = (settings: PluginSettings) => {
       result = swiftuiMain(convertedSelection, settings);
       break;
   }
-
+  console.log(result);
   figma.ui.postMessage({
     type: "code",
     data: result,
@@ -64,14 +64,7 @@ export const run = (settings: PluginSettings) => {
               width: node.width,
               height: node.height,
             }))[0],
-            content: htmlMain(
-              convertedSelection,
-              {
-                ...settings,
-                jsx: false,
-              },
-              true
-            ),
+            content: result,
           }
         : null,
     colors: retrieveGenericSolidUIColors(settings.framework),

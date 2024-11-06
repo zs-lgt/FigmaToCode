@@ -199,6 +199,7 @@ export default function App() {
         htmlPreview={state.htmlPreview}
         preferences={state.preferences}
         onPreferenceChange={(key: string, value: boolean | string) => {
+          console.log('key:', key, 'value:', value);
           parent.postMessage(
             {
               pluginMessage: {
