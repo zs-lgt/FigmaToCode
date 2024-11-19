@@ -6,6 +6,7 @@ import { TailwindDefaultBuilder } from "./tailwindDefaultBuilder";
 import { PluginSettings } from "../code";
 import { tailwindAutoLayoutProps } from "./builderImpl/tailwindAutoLayout";
 import { commonSortChildrenWhenInferredAutoLayout } from "../common/commonChildrenOrder";
+import { getClass, type NodeInfo } from './getClass';
 
 export let localTailwindSettings: PluginSettings;
 
@@ -133,7 +134,7 @@ const imageNodeHandler = async (node: SceneNode) => {
         // 方案1: 转换为 base64 内嵌图片
         // const svgString = generateSvgString(node, svgPath);
         // const base64Image = svgToBase64Image(svgString);
-        console.log(666, imageData);
+        console.log(667, imageData);
         // 创建一个新的 Promise 来等待上传结果
         imageUploadPromise = new Promise((resolve) => {
           // 监听来自 UI 的消息
@@ -142,18 +143,20 @@ const imageNodeHandler = async (node: SceneNode) => {
               resolve(msg.imageUrl);
             }
           };
-          
+          console.log('node呀', node);
+          const classesString = getClass(node);
           // 发送消息到 UI
           figma.ui.postMessage({
             type: 'upload-image',
             base64Image: imageData,
             nodeId: node.id,
+            classesString: classesString,
           });
         });
         
         // 等待上传完成并获取URL
         const imageUrl = await imageUploadPromise;
-        console.log(666, imageUrl);
+        console.log(668, imageUrl);
       // }
       break;
     default:
@@ -197,8 +200,14 @@ const tailwindWidgetGenerator = (
       case "SECTION":
         comp += tailwindSection(node, isJsx);
         break;
-      // case "VECTOR":
-      //   comp += htmlAsset(node, isJsx);
+      case "VECTOR":
+        console.log('node有parent', node);
+        // 如果node的id是I开头的，则跳过
+        if (node.id.startsWith("I")) {
+          break;
+        }
+        comp += tailwindContainer(node, "", "", isJsx);
+        break;
     }
   });
 
@@ -311,7 +320,7 @@ export const tailwindContainer = (
   // ignore the view when size is zero or less
   // while technically it shouldn't get less than 0, due to rounding errors,
   // it can get to values like: -0.000004196293048153166
-  console.log('node:', node);
+  console.log('node哦:', node);
   
   if (node.width < 0 || node.height < 0) {
     return children;

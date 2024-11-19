@@ -79,7 +79,8 @@ export default function App() {
               // 匹配自闭合标签和普通标签
               console.log('hahaha', message.nodeId);
               const regex = new RegExp(`<([^>]*)id="${message.nodeId}"([^>]*?)(?:>.*?</[^>]*>|/>)`, 'g');
-              const codeText = prevState.code.replace(
+              console.log('prevState.code', prevState, imageUrl);
+              let codeText = prevState.code.replace(
                 regex,
                 (match, group1, group2) => {
                   // 提取 className 和其他属性
@@ -88,7 +89,8 @@ export default function App() {
                   return `<img id="${message.nodeId}" src="${imageUrl}" className="${className}" />`;
                 }
               );
-              console.log('node:', message.node);
+              console.log('codeText', codeText);
+              
               return {
                 ...prevState,
                 code: codeText
