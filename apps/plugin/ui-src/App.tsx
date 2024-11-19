@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { FrameworkTypes, PluginSettings, PluginUI } from "plugin-ui";
-import { log } from "util";
 
 interface AppState {
   code: string;
@@ -100,7 +99,7 @@ export default function App() {
           }
           break;
         case "code":
-          console.log('message.data:', message.data, img);
+          // console.log('message.data:', message.data, img);
           setState((prevState) => ({
             ...prevState,
             code: message.data,
@@ -112,6 +111,7 @@ export default function App() {
           }));
           break;
         case "pluginSettingChanged":
+          console.log('message.data:', message.data);
           setState((prevState) => ({
             ...prevState,
             preferences: message.data,

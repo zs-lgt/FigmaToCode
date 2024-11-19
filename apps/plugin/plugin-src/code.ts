@@ -86,7 +86,7 @@ const standardMode = async () => {
   figma.on("selectionchange", () => {
     safeRun(userPluginSettings);
   });
-  figma.ui.onmessage = (msg) => {
+  figma.ui.on('message', (msg) => {
     console.log("[node] figma.ui.onmessage", msg);
 
     if (msg.type === "pluginSettingChanged") {
@@ -98,7 +98,7 @@ const standardMode = async () => {
       // });
       safeRun(userPluginSettings);
     }
-  };
+  });
 };
 
 const codegenMode = async () => {

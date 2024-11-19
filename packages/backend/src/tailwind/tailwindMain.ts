@@ -45,7 +45,7 @@ const tailwindWidgetGenerator = (
   
   visibleSceneNode.forEach((node) => {
     console.log(123,node.name, node.type, node);
-    
+
     switch (node.type) {
       case "RECTANGLE":
       case "ELLIPSE":
@@ -63,11 +63,12 @@ const tailwindWidgetGenerator = (
                 // 创建一个新的 Promise 来等待上传结果
                 imageUploadPromise = new Promise((resolve) => {
                   // 监听来自 UI 的消息
-                  figma.ui.onmessage = (msg) => {
+                  figma.ui.on('message', (msg) => {
+                    console.log('figma.ui.onmessage:', msg);
                     if (msg.type === 'upload-image-complete') {
                       resolve(msg.imageUrl);
                     }
-                  };
+                  });
                   
                   // 发送消息到 UI
                   figma.ui.postMessage({
@@ -255,14 +256,10 @@ export const tailwindContainer = (
     }
 
     if (children) {
-      console.log('children1:', children);
       return `\n<${tag}${build}${src}>${indentString(children)}\n</${tag}>`;
     } else if (selfClosingTags.includes(tag) || isJsx) {
-      console.log('children2:', children);
       return `\n<${tag} id="${node.id}"${build}${src} />`;
     } else {
-      console.log('children3:', children);
-
       return `\n<${tag}${build}${src}></${tag}>`;
     }
   }
