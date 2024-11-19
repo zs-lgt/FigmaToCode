@@ -6,6 +6,7 @@ import { TailwindDefaultBuilder } from "./tailwindDefaultBuilder";
 import { PluginSettings } from "../code";
 import { tailwindAutoLayoutProps } from "./builderImpl/tailwindAutoLayout";
 import { commonSortChildrenWhenInferredAutoLayout } from "../common/commonChildrenOrder";
+import { getClass, type NodeInfo } from './getClass';
 
 export let localTailwindSettings: PluginSettings;
 
@@ -33,6 +34,137 @@ export const tailwindMain = (
   return result;
 };
 
+// 添加一个辅助函数来将字符串转换为 Uint8Array
+const stringToUint8Array = (str: string): Uint8Array => {
+  const arr = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) {
+    arr[i] = str.charCodeAt(i);
+  }
+  return arr;
+};
+
+// 添加工具函数:将 SVG 转换为 base64 图片
+const svgToBase64Image = (svgString: string) => {
+  console.log('svgString:', svgString);
+  return `data:image/svg+xml;base64,${figma.base64Encode(stringToUint8Array(svgString))}`;
+};
+
+// 添加工具函数:生成SVG字符串
+const generateSvgString = (node: SceneNode, svgPath: string) => {
+  const viewBox = `0 0 ${node.width} ${node.height}`;
+  return `<svg width="${node.width}" height="${node.height}" viewBox="${viewBox}" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+    <path d="${svgPath}" fill-rule="evenodd"/>
+  </svg>`;
+};
+const getNodeExportImage = async (nodeId: string) => {
+  try {
+    // 获取节点
+    const node = figma.getNodeById(nodeId);
+    if (!node) return null;
+
+    // 使用节点的导出设置导出图片
+    const settings = node.exportSettings[0];
+    const bytes = await node.exportAsync({
+      format: settings.format as "PNG" | "JPG" | "SVG" | "PDF",
+      constraint: settings.constraint,
+      contentsOnly: settings.contentsOnly
+    });
+
+    // 转换为 base64
+    const base64String = figma.base64Encode(bytes);
+    return `data:image/${settings.format.toLowerCase()};base64,${base64String}`;
+
+  } catch (error) {
+    console.error('Error exporting node:', error);
+    return null;
+  }
+};
+// 图片节点处理
+const imageNodeHandler = async (node: SceneNode) => {
+  console.log('txr', node);
+  switch (node.type) {
+    case "RECTANGLE":
+    case "ELLIPSE":
+      if (node.isAsset) {
+        node.fills.forEach(async (fill) => {
+          if (fill.type === "IMAGE") {
+            const imageHash = fill.imageHash;
+            const imgFile = figma.getImageByHash(imageHash);
+            try {
+              // 获取图片的二进制数据
+              const imageBytes = await imgFile.getBytesAsync();
+              // 将图片二进制文件转成base64 格式
+              const base64Image = `data:image/png;base64,${figma.base64Encode(imageBytes)}`;
+              // 发送消息到 UI 层处理网络请求
+              // 创建一个新的 Promise 来等待上传结果
+              imageUploadPromise = new Promise((resolve) => {
+                // 监听来自 UI 的消息
+                figma.ui.onmessage = (msg) => {
+                  if (msg.type === 'upload-image-complete') {
+                    resolve(msg.imageUrl);
+                  }
+                };
+                
+                // 发送消息到 UI
+                figma.ui.postMessage({
+                  type: 'upload-image',
+                  base64Image: base64Image,
+                  nodeId: node.id,
+                });
+              });
+              
+              // 等待上传完成并获取URL
+              const imageUrl = await imageUploadPromise;
+              // 使用返回的图片URL更新组件
+              console.log('final imageUrl:', imageUrl);
+              // builder.addAttributes(`bg-[url(${imageUrl})]`);
+            } catch (error) {
+              console.error('图片处理失败:', error);
+            }
+          }
+        });
+      }
+      break;
+    case "INSTANCE":
+    case "VECTOR":
+      console.log('txr2', node);
+      // 检查是否为矢量图标
+        // const svgPath = node.fillGeometry[0].data;
+        const imageData = await getNodeExportImage(node.id);
+        // 方案1: 转换为 base64 内嵌图片
+        // const svgString = generateSvgString(node, svgPath);
+        // const base64Image = svgToBase64Image(svgString);
+        console.log(667, imageData);
+        // 创建一个新的 Promise 来等待上传结果
+        imageUploadPromise = new Promise((resolve) => {
+          // 监听来自 UI 的消息
+          figma.ui.onmessage = (msg) => {
+            if (msg.type === 'upload-image-complete') {
+              resolve(msg.imageUrl);
+            }
+          };
+          console.log('node呀', node);
+          const classesString = getClass(node);
+          // 发送消息到 UI
+          figma.ui.postMessage({
+            type: 'upload-image',
+            base64Image: imageData,
+            nodeId: node.id,
+            classesString: classesString,
+          });
+        });
+        
+        // 等待上传完成并获取URL
+        const imageUrl = await imageUploadPromise;
+        console.log(668, imageUrl);
+      // }
+      break;
+    default:
+      break;
+  }
+  
+}
+
 // todo：代码检查想法：将 BorderRadius.only(topleft: 8, topRight: 8) 替换为 BorderRadius.horizontal(8)
 const tailwindWidgetGenerator = (
   sceneNode: ReadonlyArray<SceneNode>,
@@ -42,53 +174,12 @@ const tailwindWidgetGenerator = (
 
   // 过滤不可见节点。这一步是必要的，因为转换已经发生。
   const visibleSceneNode = sceneNode.filter((d) => d.visible);
-  
   visibleSceneNode.forEach((node) => {
-    console.log(123,node.name, node.type, node);
-
+    // 图片节点处理
+    imageNodeHandler(node);
     switch (node.type) {
       case "RECTANGLE":
       case "ELLIPSE":
-        if (node.isAsset) {
-          node.fills.forEach(async (fill) => {
-            if (fill.type === "IMAGE") {
-              const imageHash = fill.imageHash;
-              const imgFile = figma.getImageByHash(imageHash);
-              try {
-                // 获取图片的二进制数据
-                const imageBytes = await imgFile.getBytesAsync();
-                // 将图片二进制文件转成base64 格式
-                const base64Image = `data:image/png;base64,${figma.base64Encode(imageBytes)}`;
-                // 发送消息到 UI 层处理网络请求
-                // 创建一个新的 Promise 来等待上传结果
-                imageUploadPromise = new Promise((resolve) => {
-                  // 监听来自 UI 的消息
-                  figma.ui.on('message', (msg) => {
-                    console.log('figma.ui.onmessage:', msg);
-                    if (msg.type === 'upload-image-complete') {
-                      resolve(msg.imageUrl);
-                    }
-                  });
-                  
-                  // 发送消息到 UI
-                  figma.ui.postMessage({
-                    type: 'upload-image',
-                    base64Image: base64Image,
-                    nodeId: node.id,
-                  });
-                });
-                
-                // 等待上传完成并获取URL
-                const imageUrl = await imageUploadPromise;
-                // 使用返回的图片URL更新组件
-                console.log('final imageUrl:', imageUrl);
-                // builder.addAttributes(`bg-[url(${imageUrl})]`);
-              } catch (error) {
-                console.error('图片处理失败:', error);
-              }
-            }
-          });
-        }
         comp += tailwindContainer(node, "", "", isJsx);
         break;
       case "GROUP":
@@ -109,8 +200,14 @@ const tailwindWidgetGenerator = (
       case "SECTION":
         comp += tailwindSection(node, isJsx);
         break;
-      // case "VECTOR":
-      //   comp += htmlAsset(node, isJsx);
+      case "VECTOR":
+        console.log('node有parent', node);
+        // 如果node的id是I开头的，则跳过
+        if (node.id.startsWith("I")) {
+          break;
+        }
+        comp += tailwindContainer(node, "", "", isJsx);
+        break;
     }
   });
 
@@ -223,7 +320,7 @@ export const tailwindContainer = (
   // ignore the view when size is zero or less
   // while technically it shouldn't get less than 0, due to rounding errors,
   // it can get to values like: -0.000004196293048153166
-  console.log('node:', node);
+  console.log('node哦:', node);
   
   if (node.width < 0 || node.height < 0) {
     return children;
@@ -303,7 +400,7 @@ export const tailwindCodeGenTextStyles = () => {
     .join("\n---\n");
 
   if (!result) {
-    return "// 此选择中没有文本样式";
+    return "// 此选择中没有文本���式";
   }
 
   return result;

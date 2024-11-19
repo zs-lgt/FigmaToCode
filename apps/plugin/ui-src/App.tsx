@@ -77,18 +77,20 @@ export default function App() {
             }, '*');
             setState((prevState) => {
               // 匹配自闭合标签和普通标签
+              console.log('hahaha', message.nodeId);
               const regex = new RegExp(`<([^>]*)id="${message.nodeId}"([^>]*?)(?:>.*?</[^>]*>|/>)`, 'g');
-              const codeText = prevState.code.replace(
+              console.log('prevState.code', prevState, imageUrl);
+              let codeText = prevState.code.replace(
                 regex,
                 (match, group1, group2) => {
                   // 提取 className 和其他属性
                   const classMatch = (group1 + group2).match(/className="([^"]*)"/) || [];
                   const className = classMatch[1] || '';
-                  
                   return `<img id="${message.nodeId}" src="${imageUrl}" className="${className}" />`;
                 }
               );
-              console.log('替换后的代码:', codeText);
+              console.log('codeText', codeText);
+              
               return {
                 ...prevState,
                 code: codeText
@@ -99,7 +101,6 @@ export default function App() {
           }
           break;
         case "code":
-          // console.log('message.data:', message.data, img);
           setState((prevState) => ({
             ...prevState,
             code: message.data,
