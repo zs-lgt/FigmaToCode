@@ -303,7 +303,19 @@ export const CodePanel = (props: {
   const handleButtonClick = () => {
     setIsPressed(true);
     setTimeout(() => setIsPressed(false), 250);
-    copy(`create-x\`\`\`${props.code}\`\`\``);
+    
+    // 创建React组件模板
+    const componentTemplate = `import React from 'react';
+
+function View() {
+    return (
+        ${props.code}
+    );
+}
+
+export default View;`;
+
+    copy(`${componentTemplate}`);
     window.open("http://localhost:3001", "_blank");
   };
 
