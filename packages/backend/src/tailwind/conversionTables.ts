@@ -128,7 +128,6 @@ export function getColorInfo(fill: SolidPaint | ColorStop) {
   let colorType: "arbitrary" | "tailwind" | "variable";
   let hex: string = "#" + rgbTo6hex(fill.color);
   let meta: string = ''
-
   // variable
   if (localTailwindSettings.customTailwindColors && fill.boundVariables?.color) {
     colorName = variableToColorName(fill.boundVariables.color);

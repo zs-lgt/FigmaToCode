@@ -10,7 +10,9 @@ type Kind = "text" | "bg" | "border" | "solid"
  */
 export function tailwindColor(fill: SolidPaint) {
   const { hex, colorType, colorName, meta } = getColorInfo(fill);
-  const exportValue = tailwindSolidColor(fill, "solid");
+  console.log('fill:', fill);
+  const exportValue = tailwindSolidColor(fill, "solid")
+  console.log('exportValue:', exportValue);
   return {
     exportValue,
     colorName,

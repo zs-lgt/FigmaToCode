@@ -63,10 +63,8 @@ export default function App() {
             });
             
             const data = await response.json();
-            console.log('上传响应:', data);
             const imageUrl = data.data.code_url;
             img = imageUrl;
-            console.log('上传成功，图片链接：', imageUrl);
   
             // 将URL发送回主线程
             parent.postMessage({
@@ -77,9 +75,7 @@ export default function App() {
             }, '*');
             setState((prevState) => {
               // 匹配自闭合标签和普通标签
-              console.log('hahaha', message.nodeId);
               const regex = new RegExp(`<([^>]*)id="${message.nodeId}"([^>]*?)(?:>.*?</[^>]*>|/>)`, 'g');
-              console.log('prevState.code', prevState, imageUrl);
               let codeText = prevState.code.replace(
                 regex,
                 (match, group1, group2) => {

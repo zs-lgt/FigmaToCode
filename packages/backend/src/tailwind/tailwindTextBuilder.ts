@@ -14,6 +14,8 @@ import { TailwindDefaultBuilder } from "./tailwindDefaultBuilder";
 export class TailwindTextBuilder extends TailwindDefaultBuilder {
   getTextSegments(id: string): { style: string; text: string }[] {
     const segments = globalTextStyleSegments[id];
+
+    console.log('globalTextStyleSegments', segments)
     if (!segments) {
       return [];
     }
@@ -31,12 +33,13 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
         segment.fontSize
       );
       // const textIndentStyle = this.indentStyle(segment.indentation);
-
+      console.log('segment', segment)
       const styleClasses = [
         color,
         this.fontSize(segment.fontSize),
         this.fontWeight(segment.fontWeight),
         this.fontFamily(segment.fontName),
+        this.lineClamp(segments.maxLines),
         textDecoration,
         textTransform,
         lineHeightStyle,
@@ -99,6 +102,11 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
   fontFamily = (fontName: FontName): string => {
     return "font-['" + fontName.family + "']";
   };
+
+  lineClamp = (node: TextNode) => {
+    this.addAttributes(node?.maxLines ? `line-clamp-${node.maxLines}` : '');
+    return this;
+  }
 
   /**
    * https://tailwindcss.com/docs/font-size/
