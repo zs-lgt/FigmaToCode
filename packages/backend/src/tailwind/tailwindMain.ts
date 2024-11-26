@@ -45,7 +45,6 @@ const stringToUint8Array = (str: string): Uint8Array => {
 
 // 添加工具函数:将 SVG 转换为 base64 图片
 const svgToBase64Image = (svgString: string) => {
-  console.log('svgString:', svgString);
   return `data:image/svg+xml;base64,${figma.base64Encode(stringToUint8Array(svgString))}`;
 };
 
@@ -81,7 +80,6 @@ const getNodeExportImage = async (nodeId: string) => {
 };
 // 图片节点处理
 const imageNodeHandler = async (node: SceneNode) => {
-  console.log('txr', node);
   switch (node.type) {
     case "RECTANGLE":
     case "ELLIPSE":
@@ -116,7 +114,6 @@ const imageNodeHandler = async (node: SceneNode) => {
               // 等待上传完成并获取URL
               const imageUrl = await imageUploadPromise;
               // 使用返回的图片URL更新组件
-              console.log('final imageUrl:', imageUrl);
               // builder.addAttributes(`bg-[url(${imageUrl})]`);
             } catch (error) {
               console.error('图片处理失败:', error);
@@ -127,14 +124,12 @@ const imageNodeHandler = async (node: SceneNode) => {
       break;
     case "INSTANCE":
     case "VECTOR":
-      console.log('txr2', node);
       // 检查是否为矢量图标
         // const svgPath = node.fillGeometry[0].data;
         const imageData = await getNodeExportImage(node.id);
         // 方案1: 转换为 base64 内嵌图片
         // const svgString = generateSvgString(node, svgPath);
         // const base64Image = svgToBase64Image(svgString);
-        console.log(667, imageData);
         // 创建一个新的 Promise 来等待上传结果
         imageUploadPromise = new Promise((resolve) => {
           // 监听来自 UI 的消息
@@ -143,7 +138,6 @@ const imageNodeHandler = async (node: SceneNode) => {
               resolve(msg.imageUrl);
             }
           };
-          console.log('node呀', node);
           const classesString = getClass(node);
           // 发送消息到 UI
           figma.ui.postMessage({
@@ -156,7 +150,6 @@ const imageNodeHandler = async (node: SceneNode) => {
         
         // 等待上传完成并获取URL
         const imageUrl = await imageUploadPromise;
-        console.log(668, imageUrl);
       // }
       break;
     default:
@@ -201,7 +194,6 @@ const tailwindWidgetGenerator = (
         comp += tailwindSection(node, isJsx);
         break;
       case "VECTOR":
-        console.log('node有parent', node);
         // 如果node的id是I开头的，则跳过
         if (node.id.startsWith("I")) {
           break;
@@ -320,7 +312,6 @@ export const tailwindContainer = (
   // ignore the view when size is zero or less
   // while technically it shouldn't get less than 0, due to rounding errors,
   // it can get to values like: -0.000004196293048153166
-  console.log('node哦:', node);
   
   if (node.width < 0 || node.height < 0) {
     return children;

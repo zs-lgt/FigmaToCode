@@ -652,7 +652,6 @@ export const Preview: React.FC<{
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const reactCodeWrapper = () => {
-    console.log("reactCodeWrapper", props.htmlPreview.content);
 
     // class的特殊字符转义
     

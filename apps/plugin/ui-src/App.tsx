@@ -39,7 +39,6 @@ export default function App() {
   useEffect(() => {
     window.onmessage = async (event: MessageEvent) => {
       const message = event.data.pluginMessage;
-      console.log("[ui] message received hha:", message);
       switch (message.type) {
         case "upload-image":
           try {
@@ -63,10 +62,8 @@ export default function App() {
             });
             
             const data = await response.json();
-            console.log('上传响应:', data);
             const imageUrl = data.data.code_url;
             img = imageUrl;
-            console.log('上传成功，图片链接：', imageUrl);
   
             // 将URL发送回主线程
             parent.postMessage({
@@ -77,9 +74,7 @@ export default function App() {
             }, '*');
             setState((prevState) => {
               // 匹配自闭合标签和普通标签
-              console.log('hahaha', message.nodeId);
               const regex = new RegExp(`<([^>]*)id="${message.nodeId}"([^>]*?)(?:>.*?</[^>]*>|/>)`, 'g');
-              console.log('prevState.code', prevState, imageUrl);
               let codeText = prevState.code.replace(
                 regex,
                 (match, group1, group2) => {
@@ -89,7 +84,6 @@ export default function App() {
                   return `<img id="${message.nodeId}" src="${imageUrl}" className="${className}" />`;
                 }
               );
-              console.log('codeText', codeText);
               
               return {
                 ...prevState,
@@ -112,7 +106,6 @@ export default function App() {
           }));
           break;
         case "pluginSettingChanged":
-          console.log('message.data:', message.data);
           setState((prevState) => ({
             ...prevState,
             preferences: message.data,
@@ -184,7 +177,6 @@ export default function App() {
       "*"
     );
   };
-  console.log("state.code", state.code.slice(0, 25));
 
   return (
     <div
@@ -200,7 +192,6 @@ export default function App() {
         htmlPreview={state.htmlPreview}
         preferences={state.preferences}
         onPreferenceChange={(key: string, value: boolean | string) => {
-          console.log('key:', key, 'value:', value);
           parent.postMessage(
             {
               pluginMessage: {

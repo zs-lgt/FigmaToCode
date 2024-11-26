@@ -87,8 +87,6 @@ const standardMode = async () => {
     safeRun(userPluginSettings);
   });
   figma.ui.on('message', (msg) => {
-    console.log("[node] figma.ui.onmessage", msg);
-
     if (msg.type === "pluginSettingChanged") {
       (userPluginSettings as any)[msg.key] = msg.value;
       figma.clientStorage.setAsync("userPluginSettings", userPluginSettings);
