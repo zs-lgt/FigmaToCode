@@ -303,7 +303,12 @@ export const CodePanel = (props: {
   const handleButtonClick = () => {
     setIsPressed(true);
     setTimeout(() => setIsPressed(false), 250);
-    copy(`create-x\`\`\`${props.code}\`\`\``);
+    copy(`create-x:
+      image
+      \`\`\`${props.code}\`\`\`
+      code
+      \`\`\`${props.code}\`\`\`
+    `);
     window.open("http://localhost:3001", "_blank");
   };
 
