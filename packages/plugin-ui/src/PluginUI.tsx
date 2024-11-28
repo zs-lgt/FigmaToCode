@@ -120,6 +120,11 @@ export const PluginUI = (props: PluginUIProps) => {
           )}
         </div>
       </div>
+      <div 
+        id="resize-handle"
+        className="fixed bottom-0 right-0 w-4 h-4 cursor-se-resize"
+        onMouseDown={initResize}
+      />
     </div>
   );
 };
@@ -795,3 +800,30 @@ const ExpandIcon = (props: { size: number }) => (
     <path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM101.66,53.66,120,35.31V96a8,8,0,0,0,16,0V35.31l18.34,18.35a8,8,0,0,0,11.32-11.32l-32-32a8,8,0,0,0-11.32,0l-32,32a8,8,0,0,0,11.32,11.32Zm52.68,148.68L136,220.69V160a8,8,0,0,0-16,0v60.69l-18.34-18.35a8,8,0,0,0-11.32,11.32l32,32a8,8,0,0,0,11.32,0l32-32a8,8,0,0,0-11.32-11.32Z"></path>
   </svg>
 );
+
+const initResize = (e: React.MouseEvent) => {
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const startWidth = document.documentElement.offsetWidth;
+  const startHeight = document.documentElement.offsetHeight;
+  
+  const resize = (e: MouseEvent) => {
+    const newWidth = startWidth + (e.clientX - startX);
+    const newHeight = startHeight + (e.clientY - startY);
+    parent.postMessage({ 
+      pluginMessage: { 
+        type: 'resize',
+        width: Math.max(newWidth, 450), // 设置最小宽度
+        height: Math.max(newHeight, 550) // 设置最小高度
+      } 
+    }, '*');
+  };
+
+  const stopResize = () => {
+    document.removeEventListener('mousemove', resize);
+    document.removeEventListener('mouseup', stopResize);
+  };
+
+  document.addEventListener('mousemove', resize);
+  document.addEventListener('mouseup', stopResize);
+};

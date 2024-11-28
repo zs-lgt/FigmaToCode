@@ -34,27 +34,6 @@ export const tailwindMain = (
   return result;
 };
 
-// 添加一个辅助函数来将字符串转换为 Uint8Array
-const stringToUint8Array = (str: string): Uint8Array => {
-  const arr = new Uint8Array(str.length);
-  for (let i = 0; i < str.length; i++) {
-    arr[i] = str.charCodeAt(i);
-  }
-  return arr;
-};
-
-// 添加工具函数:将 SVG 转换为 base64 图片
-const svgToBase64Image = (svgString: string) => {
-  return `data:image/svg+xml;base64,${figma.base64Encode(stringToUint8Array(svgString))}`;
-};
-
-// 添加工具函数:生成SVG字符串
-const generateSvgString = (node: SceneNode, svgPath: string) => {
-  const viewBox = `0 0 ${node.width} ${node.height}`;
-  return `<svg width="${node.width}" height="${node.height}" viewBox="${viewBox}" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <path d="${svgPath}" fill-rule="evenodd"/>
-  </svg>`;
-};
 const getNodeExportImage = async (nodeId: string) => {
   try {
     // 获取节点
@@ -63,6 +42,8 @@ const getNodeExportImage = async (nodeId: string) => {
 
     // 使用节点的导出设置导出图片
     const settings = node.exportSettings[0];
+    console.log("[getNodeExportImage] settings:", settings);
+    
     const bytes = await node.exportAsync({
       format: settings.format as "PNG" | "JPG" | "SVG" | "PDF",
       constraint: settings.constraint,
@@ -124,39 +105,44 @@ const imageNodeHandler = async (node: SceneNode) => {
       break;
     case "INSTANCE":
     case "VECTOR":
-      // 检查是否为矢量图标
-        // const svgPath = node.fillGeometry[0].data;
+      
+      const imageData = await getNodeExportImage(node.id);
+      const classesString = getClass(node);
+      const imageUrl = await uploadImageToUI(imageData, node.id, classesString);
+      break;
+    case "GROUP":
+      if (node?.exportSettings?.length > 0) {
         const imageData = await getNodeExportImage(node.id);
-        // 方案1: 转换为 base64 内嵌图片
-        // const svgString = generateSvgString(node, svgPath);
-        // const base64Image = svgToBase64Image(svgString);
-        // 创建一个新的 Promise 来等待上传结果
-        imageUploadPromise = new Promise((resolve) => {
-          // 监听来自 UI 的消息
-          figma.ui.onmessage = (msg) => {
-            if (msg.type === 'upload-image-complete') {
-              resolve(msg.imageUrl);
-            }
-          };
-          const classesString = getClass(node);
-          // 发送消息到 UI
-          figma.ui.postMessage({
-            type: 'upload-image',
-            base64Image: imageData,
-            nodeId: node.id,
-            classesString: classesString,
-          });
-        });
+        const classesString = getClass(node);
+        const imageUrl = await uploadImageToUI(imageData, node.id, classesString);
         
-        // 等待上传完成并获取URL
-        const imageUrl = await imageUploadPromise;
-      // }
+      }
       break;
     default:
       break;
   }
   
 }
+
+// 添加新的图片上传函数
+const uploadImageToUI = async (imageData: string | null, nodeId: string, classesString?: string): Promise<string> => {
+  if (!imageData) return '';
+  
+  return new Promise((resolve) => {
+    figma.ui.onmessage = (msg) => {
+      if (msg.type === 'upload-image-complete') {
+        resolve(msg.imageUrl);
+      }
+    };
+
+    figma.ui.postMessage({
+      type: 'upload-image',
+      base64Image: imageData,
+      nodeId: nodeId,
+      classesString: classesString,
+    });
+  });
+};
 
 // todo：代码检查想法：将 BorderRadius.only(topleft: 8, topRight: 8) 替换为 BorderRadius.horizontal(8)
 const tailwindWidgetGenerator = (
@@ -215,14 +201,29 @@ const tailwindGroup = (node: GroupNode, isJsx: boolean = false): string => {
     return "";
   }
 
+  // 如果存在导出设置，只返回容器节点，不处理子节点
+  if (node?.exportSettings?.length > 0) {
+    const builder = new TailwindDefaultBuilder(
+      node,
+      localTailwindSettings.layerName,
+      isJsx
+    )
+      .blend(node)
+      .size(node, localTailwindSettings.optimizeLayout)
+      .position(node, localTailwindSettings.optimizeLayout);
+
+    const attr = builder.build("");
+    return `\n<div id="${node.id}"${attr}></div>`;
+  }
+
   const vectorIfExists = tailwindVector(
     node,
     localTailwindSettings.layerName,
     "",
     isJsx
   );
+  
   if (vectorIfExists) return vectorIfExists;
-
   // this needs to be called after CustomNode because widthHeight depends on it
   const builder = new TailwindDefaultBuilder(
     node,
@@ -391,7 +392,7 @@ export const tailwindCodeGenTextStyles = () => {
     .join("\n---\n");
 
   if (!result) {
-    return "// 此选择中没有文本���式";
+    return "// 此选择中没有文本式";
   }
 
   return result;

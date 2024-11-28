@@ -81,7 +81,11 @@ const safeRun = (settings: PluginSettings) => {
 };
 
 const standardMode = async () => {
-  figma.showUI(__html__, { width: 450, height: 550, themeColors: true });
+  figma.showUI(__html__, { 
+    width: 675, 
+    height: 825, 
+    themeColors: true,
+  });
   await initSettings();
   figma.on("selectionchange", () => {
     safeRun(userPluginSettings);
@@ -95,6 +99,9 @@ const standardMode = async () => {
       //   data: userPluginSettings,
       // });
       safeRun(userPluginSettings);
+    }
+    if (msg.type === 'resize') {
+      figma.ui.resize(msg.width, msg.height);
     }
   });
 };
