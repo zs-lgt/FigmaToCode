@@ -110,6 +110,7 @@ const imageNodeHandler = async (node: SceneNode) => {
       const classesString = getClass(node);
       const imageUrl = await uploadImageToUI(imageData, node.id, classesString);
       break;
+    case "FRAME":
     case "GROUP":
       if (node?.exportSettings?.length > 0) {
         const imageData = await getNodeExportImage(node.id);
@@ -274,6 +275,20 @@ const tailwindFrame = (
   node: FrameNode | InstanceNode | ComponentNode | ComponentSetNode,
   isJsx: boolean
 ): string => {
+  // 如果存在导出设置并且非图片，只返回容器节点，不处理子节点
+  if (node?.exportSettings?.length > 0 && node.isAsset) {
+    const builder = new TailwindDefaultBuilder(
+      node,
+      localTailwindSettings.layerName,
+      isJsx
+    )
+      .blend(node)
+      .size(node, localTailwindSettings.optimizeLayout)
+      .position(node, localTailwindSettings.optimizeLayout);
+
+    const attr = builder.build("");
+    return `\n<div id="${node.id}"${attr}></div>`;
+  }
   const childrenStr = tailwindWidgetGenerator(
     commonSortChildrenWhenInferredAutoLayout(
       node,
