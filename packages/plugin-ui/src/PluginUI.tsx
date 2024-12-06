@@ -309,7 +309,7 @@ export const CodePanel = (props: {
       code
       \`\`\`${props.code}\`\`\`
     `);
-    window.open("http://localhost:3001", "_blank");
+    window.open("https://frontend.myhexin.com/kingfisher/collector/html/kamis-comp-create/?hexinMatrix=1&&kacreate=1", "_blank");
   };
 
   const handleButtonHover = () => setSyntaxHovered(true);
@@ -743,8 +743,8 @@ export const Preview: React.FC<{
                     {
                       "w-full h-[832px]": props.htmlPreview.device === "desktop",
                       "w-[400px] h-[832px]": props.htmlPreview.device === "mobile",
-                  }
-                )}
+                    }
+                  )}
                 ></iframe>
               </div>
               {/* <span className="mt-auto text-xs text-gray-500">
