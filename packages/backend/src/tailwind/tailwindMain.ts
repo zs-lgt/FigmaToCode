@@ -253,7 +253,8 @@ export const tailwindText = (node: TextNode, isJsx: boolean): string => {
     isJsx
   )
     .commonPositionStyles(node, localTailwindSettings.optimizeLayout)
-    .textAlign(node);
+    .textAlign(node)
+    .lineClamp(node);
 
   const styledHtml = layoutBuilder.getTextSegments(node.id);
   previousExecutionCache.push(...styledHtml);

@@ -308,20 +308,13 @@ export const CodePanel = (props: {
   const handleButtonClick = () => {
     setIsPressed(true);
     setTimeout(() => setIsPressed(false), 250);
-    
-    // 创建React组件模板
-    const componentTemplate = `import React from 'react';
-
-function View() {
-    return (
-        ${props.code}
-    );
-}
-
-export default View;`;
-
-    copy(`${componentTemplate}`);
-    window.open("http://localhost:3001", "_blank");
+    copy(`create-x:
+      image
+      \`\`\`${props.code}\`\`\`
+      code
+      \`\`\`${props.code}\`\`\`
+    `);
+    window.open("https://frontend.myhexin.com/kingfisher/collector/html/kamis-comp-create/?hexinMatrix=1&&kacreate=1", "_blank");
   };
 
   const handleButtonHover = () => setSyntaxHovered(true);
@@ -754,8 +747,8 @@ export const Preview: React.FC<{
                     {
                       "w-full h-[832px]": props.htmlPreview.device === "desktop",
                       "w-[400px] h-[832px]": props.htmlPreview.device === "mobile",
-                  }
-                )}
+                    }
+                  )}
                 ></iframe>
               </div>
               {/* <span className="mt-auto text-xs text-gray-500">
