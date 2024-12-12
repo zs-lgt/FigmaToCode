@@ -304,7 +304,6 @@ export const CodePanel = (props: {
   const [isPressed, setIsPressed] = useState(false);
   const [syntaxHovered, setSyntaxHovered] = useState(false);
 
-  // Add your clipboard function here or any other actions
   const handleButtonClick = () => {
     setIsPressed(true);
     setTimeout(() => setIsPressed(false), 250);
@@ -317,8 +316,21 @@ export const CodePanel = (props: {
     window.open("https://frontend.myhexin.com/kingfisher/collector/html/kamis-comp-create/?hexinMatrix=1&&kacreate=1", "_blank");
   };
 
-  const handleButtonHover = () => setSyntaxHovered(true);
-  const handleButtonLeave = () => setSyntaxHovered(false);
+  const handleExportNodesClick = () => {
+    parent.postMessage({ 
+      pluginMessage: { 
+        type: 'export-nodes'
+      } 
+    }, '*');
+  };
+
+  const handleExportDescription = () => {
+    parent.postMessage({ 
+      pluginMessage: { 
+        type: 'export-description'
+      } 
+    }, '*');
+  };
 
   if (emptySelection) {
     return (
@@ -339,18 +351,28 @@ export const CodePanel = (props: {
           <p className="text-lg font-medium text-center dark:text-white rounded-lg">
             代码预览
           </p>
-          <button
-            className={`px-4 py-1 text-sm font-semibold border border-green-500 rounded-md shadow-sm hover:bg-green-500 dark:hover:bg-green-600 hover:text-white hover:border-transparent transition-all duration-300 ${
-              isPressed
-                ? "bg-green-500 dark:text-white hover:bg-green-500 ring-4 ring-green-300 ring-opacity-50 animate-pulse"
-                : "bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 border-neutral-300 dark:border-neutral-600"
-            }`}
-            onClick={handleButtonClick}
-            onMouseEnter={handleButtonHover}
-            onMouseLeave={handleButtonLeave}
-          >
-            导出到KAmis
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleButtonClick}
+              className={`flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                isPressed ? "transform scale-95" : ""
+              }`}
+            >
+              导出到KAmis
+            </button>
+            <button
+              onClick={handleExportNodesClick}
+              className="ml-2 flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              导出UI
+            </button>
+            <button
+              onClick={handleExportDescription}
+              className="ml-2 flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              导出UX
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-2 justify-center flex-col p-2 dark:bg-black dark:bg-opacity-25 bg-neutral-100 ring-1 ring-neutral-200 dark:ring-neutral-700 rounded-lg text-sm">

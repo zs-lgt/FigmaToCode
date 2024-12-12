@@ -94,6 +94,40 @@ export default function App() {
             console.error('上传失败:', error);
           }
           break;
+        case "export-ux":
+          console.log("Exported UX:", message.data);
+          try {
+            // 下载描述信息文件
+            const descriptionBlob = new Blob([JSON.stringify({ description: message.data.description }, null, 2)], { type: 'application/json' });
+            const descriptionUrl = window.URL.createObjectURL(descriptionBlob);
+            const descriptionLink = document.createElement('a');
+            descriptionLink.href = descriptionUrl;
+            descriptionLink.setAttribute('download', 'description.json');
+            document.body.appendChild(descriptionLink);
+            descriptionLink.click();
+            document.body.removeChild(descriptionLink);
+            window.URL.revokeObjectURL(descriptionUrl);
+          } catch (error) {
+            console.error('下载文件失败:', error);
+          }
+          break;
+        case "export-nodes-result":
+          console.log("Exported nodes:", message.nodes);
+          try {
+            // 下载节点信息文件
+            const nodesBlob = new Blob([message.data.nodesInfo], { type: 'application/json' });
+            const nodesUrl = window.URL.createObjectURL(nodesBlob);
+            const nodesLink = document.createElement('a');
+            nodesLink.href = nodesUrl;
+            nodesLink.setAttribute('download', 'nodes.json');
+            document.body.appendChild(nodesLink);
+            nodesLink.click();
+            document.body.removeChild(nodesLink);
+            window.URL.revokeObjectURL(nodesUrl);
+          } catch (error) {
+            console.error('下载文件失败:', error);
+          }
+          break;
         case "code":
           setState((prevState) => ({
             ...prevState,
