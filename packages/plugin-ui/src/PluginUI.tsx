@@ -324,14 +324,6 @@ export const CodePanel = (props: {
     }, '*');
   };
 
-  const handleExportDescription = () => {
-    parent.postMessage({ 
-      pluginMessage: { 
-        type: 'export-description'
-      } 
-    }, '*');
-  };
-
   if (emptySelection) {
     return (
       <div className="flex flex-col space-y-2 m-auto items-center justify-center p-4 {sectionStyle}">
@@ -364,13 +356,7 @@ export const CodePanel = (props: {
               onClick={handleExportNodesClick}
               className="ml-2 flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
             >
-              导出UI
-            </button>
-            <button
-              onClick={handleExportDescription}
-              className="ml-2 flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-            >
-              导出UX
+              导出设计
             </button>
           </div>
         </div>

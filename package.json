@@ -14,5 +14,8 @@
     "eslint-config-custom": "workspace:*",
     "prettier": "^3.3.3",
     "turbo": "^2.0.9"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
   }
 }

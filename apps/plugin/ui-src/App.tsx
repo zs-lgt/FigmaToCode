@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FrameworkTypes, PluginSettings, PluginUI } from "plugin-ui";
+import JSZip from 'jszip';
 
 interface AppState {
   code: string;
@@ -112,18 +113,56 @@ export default function App() {
           }
           break;
         case "export-nodes-result":
-          console.log("Exported nodes:", message.nodes);
+          console.log("Exported nodes:", message.data);
           try {
-            // 下载节点信息文件
-            const nodesBlob = new Blob([message.data.nodesInfo], { type: 'application/json' });
-            const nodesUrl = window.URL.createObjectURL(nodesBlob);
-            const nodesLink = document.createElement('a');
-            nodesLink.href = nodesUrl;
-            nodesLink.setAttribute('download', 'nodes.json');
-            document.body.appendChild(nodesLink);
-            nodesLink.click();
-            document.body.removeChild(nodesLink);
-            window.URL.revokeObjectURL(nodesUrl);
+            const zip = new JSZip();
+            
+            // 添加节点信息文件
+            if (message.data.nodesInfo) {
+              zip.file("nodes.json", message.data.nodesInfo);
+            }
+            
+            // 添加描述信息文件
+            if (message.data.description) {
+              zip.file("description.json", JSON.stringify({ description: message.data.description }, null, 2));
+            }
+            
+            // 添加图片文件
+            if (message.data.images && message.data.images.length > 0) {
+              message.data.images.forEach((imageData) => {
+                try {
+                  // 从 base64 字符串中提取实际的 base64 数据
+                  const base64Data = imageData.data.split(',')[1];
+                  // 将 base64 转换为二进制数据
+                  const binaryData = atob(base64Data);
+                  const byteArray = new Uint8Array(binaryData.length);
+                  for (let i = 0; i < binaryData.length; i++) {
+                    byteArray[i] = binaryData.charCodeAt(i);
+                  }
+                  // 将图片添加到 zip
+                  zip.file(`images/${imageData.name}.png`, byteArray, { binary: true });
+                } catch (error) {
+                  console.error(`处理图片 ${imageData.name} 时出错:`, error);
+                }
+              });
+            }
+            
+            // 生成压缩包
+            zip.generateAsync({ type: "blob" })
+              .then(function(content) {
+                // 下载压缩包
+                const url = window.URL.createObjectURL(content);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', 'design-export.zip');
+                document.body.appendChild(link);
+                link.click();
+                
+                setTimeout(() => {
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(url);
+                }, 100);
+              });
           } catch (error) {
             console.error('下载文件失败:', error);
           }

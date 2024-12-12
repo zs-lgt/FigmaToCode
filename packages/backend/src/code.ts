@@ -79,37 +79,45 @@ figma.ui.onmessage = async (msg) => {
     console.log('节点:', nodes);
     const nodesInfo = nodes.map(getNodeInfo);
     let description = "";
-    // 仅保留#开头的节点
+    
+    // 仅保留#开头的节点并提取描述信息
     const filteredNodes = nodesInfo
       .map(node => {
-        // 提取 #comments 节点的描述信息
         if (node.name === '#comments') {
           description = extractCommentDescription(node);
         }
         return filterHashNodes(node);
       })
-      // 过滤掉空节点以及 #comments 节点
       .filter(node => node !== null && node.name !== '#comments');
-    console.log('描述信息:', description);
-    // 导出每个节点为base64图片 存放在对应节点信息中
-    const filteredNodesInfo = await Promise.all(
-      filteredNodes.map(async (node) => {
-        // 获取节点的导出图片
+
+    // 导出节点信息和图片
+    const exportedNodes = [];
+    const exportedImages = [];
+
+    for (const node of filteredNodes) {
+      try {
         const imageBase64 = await getNodeExportImage(node.id);
-        // 添加导出图片信息到节点中
-        return {
-          ...node,
-          exportedImage: imageBase64
-        };
-      })
-    );
-    const nodesInfoStr = JSON.stringify(filteredNodesInfo, null, 2);
-    
-    console.log('JSON字符串:', nodesInfoStr);
+        // 保存节点信息（不包含图片数据）
+        exportedNodes.push(node);
+        // 保存图片数据
+        if (imageBase64) {
+          exportedImages.push({
+            name: node.name,
+            data: imageBase64
+          });
+        }
+      } catch (error) {
+        console.error(`处理节点 ${node.name} 时出错:`, error);
+      }
+    }
+
+    // 发送所有数据
     figma.ui.postMessage({
       type: "export-nodes-result",
       data: {
-        nodesInfo: nodesInfoStr,
+        nodesInfo: JSON.stringify(exportedNodes, null, 2),
+        description: description,
+        images: exportedImages
       }
     });
   }
