@@ -96,6 +96,78 @@ export default function App() {
             console.error('上传失败:', error);
           }
           break;
+        case "export-ux":
+          console.log("Exported UX:", message.data);
+          try {
+            // 下载描述信息文件
+            const descriptionBlob = new Blob([JSON.stringify({ description: message.data.description }, null, 2)], { type: 'application/json' });
+            const descriptionUrl = window.URL.createObjectURL(descriptionBlob);
+            const descriptionLink = document.createElement('a');
+            descriptionLink.href = descriptionUrl;
+            descriptionLink.setAttribute('download', 'description.json');
+            document.body.appendChild(descriptionLink);
+            descriptionLink.click();
+            document.body.removeChild(descriptionLink);
+            window.URL.revokeObjectURL(descriptionUrl);
+          } catch (error) {
+            console.error('下载文件失败:', error);
+          }
+          break;
+        case "export-nodes-result":
+          console.log("Exported nodes:", message.data);
+          try {
+            const zip = new JSZip();
+            
+            // 添加节点信息文件
+            if (message.data.nodesInfo) {
+              zip.file("ui.json", message.data.nodesInfo);
+            }
+            
+            // 添加描述信息文件
+            if (message.data.description) {
+              zip.file("ux.json", JSON.stringify({ description: message.data.description }, null, 2));
+            }
+            
+            // 添加图片文件
+            if (message.data.images && message.data.images.length > 0) {
+              message.data.images.forEach((imageData) => {
+                try {
+                  // 从 base64 字符串中提取实际的 base64 数据
+                  const base64Data = imageData.data.split(',')[1];
+                  // 将 base64 转换为二进制数据
+                  const binaryData = atob(base64Data);
+                  const byteArray = new Uint8Array(binaryData.length);
+                  for (let i = 0; i < binaryData.length; i++) {
+                    byteArray[i] = binaryData.charCodeAt(i);
+                  }
+                  // 将图片添加到 zip
+                  zip.file(`images/${imageData.name}.png`, byteArray, { binary: true });
+                } catch (error) {
+                  console.error(`处理图片 ${imageData.name} 时出错:`, error);
+                }
+              });
+            }
+            
+            // 生成压缩包
+            zip.generateAsync({ type: "blob" })
+              .then(function(content) {
+                // 下载压缩包
+                const url = window.URL.createObjectURL(content);
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', 'design-export.zip');
+                document.body.appendChild(link);
+                link.click();
+                
+                setTimeout(() => {
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(url);
+                }, 100);
+              });
+          } catch (error) {
+            console.error('下载文件失败:', error);
+          }
+          break;
         case "code":
           setState((prevState) => ({
             ...prevState,
