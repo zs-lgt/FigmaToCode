@@ -44,6 +44,44 @@ type PluginUIProps = {
 
 export const PluginUI = (props: PluginUIProps) => {
   const [isResponsiveExpanded, setIsResponsiveExpanded] = useState(false);
+  const [jsonInput, setJsonInput] = useState('');
+  const [showJsonModal, setShowJsonModal] = useState(false);
+
+  const handleDeleteNode = () => {
+    const selection = window.parent.postMessage(
+      { pluginMessage: { type: "delete-node" } },
+      "*"
+    );
+  };
+
+  const handleDuplicateNode = () => {
+    window.parent.postMessage(
+      { pluginMessage: { type: "duplicate-node" } },
+      "*"
+    );
+  };
+
+  const handleFetchFigmaFile = () => {
+    window.parent.postMessage(
+      { pluginMessage: { type: "fetch-figma-file" } },
+      "*"
+    );
+  };
+
+  const handleImportJson = () => {
+    try {
+      const jsonData = JSON.parse(jsonInput);
+      window.parent.postMessage(
+        { pluginMessage: { type: "import-figma-json", data: jsonData } },
+        "*"
+      );
+      setShowJsonModal(false);
+      setJsonInput('');
+    } catch (error) {
+      console.error('JSON parsing error:', error);
+      alert('Invalid JSON format');
+    }
+  };
 
   return (
     <div className="flex flex-col h-full dark:text-white">
@@ -64,6 +102,78 @@ export const PluginUI = (props: PluginUIProps) => {
           </button>
         ))}
       </div>
+      
+      {/* Node Control Buttons */}
+      <div className="flex gap-2 p-2 justify-end">
+        <button
+          className="px-3 py-1 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm"
+          onClick={handleFetchFigmaFile}
+        >
+          获取Figma文件
+        </button>
+        <button
+          className="px-3 py-1 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 rounded-md shadow-sm"
+          onClick={() => setShowJsonModal(true)}
+        >
+          导入JSON
+        </button>
+        <button
+          className="px-3 py-1 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md shadow-sm"
+          onClick={handleDeleteNode}
+        >
+          删除节点
+        </button>
+        <button
+          className="px-3 py-1 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm"
+          onClick={handleDuplicateNode}
+        >
+          复制节点
+        </button>
+      </div>
+
+      {/* JSON Import Modal */}
+      {showJsonModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setShowJsonModal(false)}></div>
+          <div className="relative bg-white dark:bg-neutral-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">导入 Figma JSON</h3>
+              <button
+                className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-white"
+                onClick={() => setShowJsonModal(false)}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <textarea
+              className="w-full h-64 p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={jsonInput}
+              onChange={(e) => setJsonInput(e.target.value)}
+              placeholder="粘贴 Figma JSON 数据..."
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                className="px-4 py-2 text-sm font-semibold text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white transition-colors"
+                onClick={() => {
+                  setShowJsonModal(false);
+                  setJsonInput('');
+                }}
+              >
+                取消
+              </button>
+              <button
+                className="px-4 py-2 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors"
+                onClick={handleImportJson}
+              >
+                导入
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div
         style={{
           height: 1,
@@ -490,10 +600,7 @@ export const ColorsPanel = (props: {
 };
 
 export const GradientsPanel = (props: {
-  gradients: {
-    cssPreview: string;
-    exportValue: string;
-  }[];
+  gradients: { cssPreview: string; exportValue: string }[];
   onColorClick: (color: string) => void;
 }) => {
   const [isPressed, setIsPressed] = useState(-1);
