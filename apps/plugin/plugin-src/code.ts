@@ -79,265 +79,779 @@ const safeRun = (settings: PluginSettings) => {
   }
 };
 
-// 处理文本节点的样式和内容
-const handleTextNode = async (node: TextNode, data: any) => {
-  try {
-    // 设置默认字体信息
-    let fontFamily = "Inter";
-    let fontStyle = "Regular";
+// Types for node creation
+interface NodeCreator {
+  createNode(data: any): Promise<SceneNode | null>;
+  setBaseProperties(node: SceneNode, data: any): void;
+  setGeometry(node: SceneNode, data: any, parentBounds?: { x: number, y: number }): { x: number, y: number };
+  setAppearance(node: SceneNode, data: any): void;
+}
 
-    // 处理样式
-    if (data.style) {
-      // 获取字体信息
-      if (data.style.fontFamily) {
-        fontFamily = data.style.fontFamily;
-      }
-      if (data.style.fontWeight) {
-        fontStyle = data.style.fontWeight >= 700 ? "Bold" : "Regular";
-      }
-
-      // 加载字体
-      try {
-        await figma.loadFontAsync({ family: fontFamily, style: fontStyle });
-      } catch {
-        // 回退到默认字体
-        fontFamily = "Inter";
-        fontStyle = "Regular";
-        await figma.loadFontAsync({ family: fontFamily, style: fontStyle });
-      }
-
-      // 应用字体
-      node.fontName = { family: fontFamily, style: fontStyle };
-
-      // 应用其他样式
-      if (data.style.fontSize) node.fontSize = data.style.fontSize;
-      if (data.style.textAlignHorizontal) node.textAlignHorizontal = data.style.textAlignHorizontal;
-      if (data.style.textAlignVertical) node.textAlignVertical = data.style.textAlignVertical;
-      if (data.style.letterSpacing) node.letterSpacing = { value: data.style.letterSpacing, unit: 'PIXELS' };
-      if (data.style.lineHeightPx) node.lineHeight = { value: data.style.lineHeightPx, unit: 'PIXELS' };
-      
-      // 设置颜色
-      if (data.style.color) {
-        node.fills = [{
-          type: 'SOLID',
-          color: {
-            r: data.style.color.r,
-            g: data.style.color.g,
-            b: data.style.color.b
-          }
-        }];
-      }
-    } else {
-      // 如果没有样式，加载默认字体
-      await figma.loadFontAsync({ family: fontFamily, style: fontStyle });
-      node.fontName = { family: fontFamily, style: fontStyle };
-    }
-
-    // 设置文本内容
-    if (data.characters) {
-      node.characters = data.characters;
-    }
-  } catch (error) {
-    console.error('Error handling text node:', error);
-    // 确保至少设置了基本字体
-    await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-    node.fontName = { family: "Inter", style: "Regular" };
+// Base node creator with common functionality
+class BaseNodeCreator implements NodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    return null;
   }
-};
 
-// Helper function to create Figma nodes from JSON data
-const createNodeFromJson = async (data: any, parent: BaseNode & ChildrenMixin): Promise<SceneNode | null> => {
-  try {
-    let node: SceneNode | null = null;
-    
-    // Create node based on type
-    switch (data.type) {
-      case 'DOCUMENT':
-      case 'CANVAS':
-      case 'FRAME':
-        node = figma.createFrame();
-        if (data.type === 'CANVAS') {
-          node.fills = [];
-          node.layoutMode = "NONE";
-        }
-        break;
-
-      case 'RECTANGLE':
-        node = figma.createRectangle();
-        break;
-
-      case 'ELLIPSE':
-        node = figma.createEllipse();
-        break;
-
-      case 'TEXT':
-        node = figma.createText();
-        await handleTextNode(node, data);
-        break;
-
-      case 'GROUP':
-        node = figma.group([], parent);
-        break;
-
-      case 'COMPONENT':
-        node = figma.createComponent();
-        break;
-
-      case 'INSTANCE':
-        // For now, we'll create a frame instead of an instance
-        node = figma.createFrame();
-        break;
-
-      case 'VECTOR':
-        node = figma.createVector();
-        break;
-
-      case 'BOOLEAN_OPERATION':
-        node = figma.createBooleanOperation();
-        break;
-
-      default:
-        console.warn(`Unsupported node type: ${data.type}`);
-        return null;
-    }
-
-    // Set name
+  setBaseProperties(node: SceneNode, data: any) {
     if (data.name) node.name = data.name;
-
-    // Set position and size from absoluteBoundingBox
-    if (data.absoluteBoundingBox) {
-      const { x, y, width, height } = data.absoluteBoundingBox;
-      
-      // Set size first (if available)
-      if (width !== undefined && height !== undefined) {
-        node.resize(width, height);
-      }
-      
-      // Set position (if available)
-      if (x !== undefined) node.x = x;
-      if (y !== undefined) node.y = y;
-    } 
-    // Fallback to absoluteRenderBounds if absoluteBoundingBox is not available
-    else if (data.absoluteRenderBounds) {
-      const { x, y, width, height } = data.absoluteRenderBounds;
-      
-      // Set size first (if available)
-      if (width !== undefined && height !== undefined) {
-        node.resize(width, height);
-      }
-      
-      // Set position (if available)
-      if (x !== undefined) node.x = x;
-      if (y !== undefined) node.y = y;
-    }
-    // If neither is available, try direct properties
-    else {
-      if (data.width !== undefined) node.resize(data.width, node.height);
-      if (data.height !== undefined) node.resize(node.width, data.height);
-      if (data.x !== undefined) node.x = data.x;
-      if (data.y !== undefined) node.y = data.y;
-    }
-
-    // Set transform properties
-    if (data.rotation !== undefined) node.rotation = data.rotation;
-    if (data.opacity !== undefined) node.opacity = data.opacity;
     if (data.visible !== undefined) node.visible = data.visible;
     if (data.locked !== undefined) node.locked = data.locked;
+    if (data.opacity !== undefined) node.opacity = data.opacity;
+  }
 
-    // Set layout properties
-    if ('layoutMode' in node) {
-      if (data.layoutMode) node.layoutMode = data.layoutMode;
-      if (data.primaryAxisSizingMode) node.primaryAxisSizingMode = data.primaryAxisSizingMode;
-      if (data.counterAxisSizingMode) node.counterAxisSizingMode = data.counterAxisSizingMode;
-      if (data.primaryAxisAlignItems) node.primaryAxisAlignItems = data.primaryAxisAlignItems;
-      if (data.counterAxisAlignItems) node.counterAxisAlignItems = data.counterAxisAlignItems;
-      if (data.paddingLeft !== undefined) node.paddingLeft = data.paddingLeft;
-      if (data.paddingRight !== undefined) node.paddingRight = data.paddingRight;
-      if (data.paddingTop !== undefined) node.paddingTop = data.paddingTop;
-      if (data.paddingBottom !== undefined) node.paddingBottom = data.paddingBottom;
-      if (data.itemSpacing !== undefined) node.itemSpacing = data.itemSpacing;
+  setGeometry(node: SceneNode, data: any, parentBounds?: { x: number, y: number }): { x: number, y: number } {
+    let width = 0;
+    let height = 0;
+    let x = 0;
+    let y = 0;
+
+    // Get absolute bounds
+    if (data.absoluteBoundingBox) {
+      width = Math.abs(data.absoluteBoundingBox.width || 0);
+      height = Math.abs(data.absoluteBoundingBox.height || 0);
+      x = data.absoluteBoundingBox.x || 0;
+      y = data.absoluteBoundingBox.y || 0;
+    } else if (data.size) {
+      width = data.size.width || 0;
+      height = data.size.height || 0;
+      x = data.x || 0;
+      y = data.y || 0;
     }
 
-    // Set fills
-    if (data.fills && data.type !== 'CANVAS') {
+    // Apply size if valid
+    if (width > 0 && height > 0) {
       try {
-        if (data.fills.some(fill => fill.type === 'IMAGE')) {
-          // Handle image fills differently
-          node.fills = [{ type: 'SOLID', color: { r: 0.8, g: 0.8, b: 0.8 } }];
-        } else {
-          // Process each fill
-          node.fills = data.fills.map(fill => {
-            if (fill.type === 'SOLID') {
-              return {
-                type: 'SOLID',
-                color: fill.color || { r: 0, g: 0, b: 0 },
-                opacity: fill.opacity,
-                blendMode: fill.blendMode || 'NORMAL'
-              };
-            }
-            return fill;
-          });
-        }
+        node.resize(width, height);
       } catch (error) {
-        console.warn('Error setting fills:', error);
+        console.warn(`Failed to resize ${node.name}:`, error);
+      }
+    }
+
+    // Convert absolute coordinates to relative if parent bounds are provided
+    if (parentBounds) {
+      x = x - parentBounds.x;
+      y = y - parentBounds.y;
+    }
+
+    // Apply position
+    node.x = x;
+    node.y = y;
+
+    if (data.rotation) {
+      node.rotation = data.rotation;
+    }
+
+    // Return the node's bounds for child positioning
+    return {
+      x: x + (parentBounds?.x || 0),
+      y: y + (parentBounds?.y || 0)
+    };
+  }
+
+  setAppearance(node: SceneNode, data: any) {
+    // Set fills
+    if ('fills' in node && data.fills) {
+      try {
+        node.fills = this.processFills(data.fills);
+      } catch (error) {
+        console.warn(`Failed to set fills for ${node.name}:`, error);
       }
     }
 
     // Set strokes
-    if (data.strokes) {
+    if ('strokes' in node && data.strokes) {
       try {
-        node.strokes = data.strokes.map(stroke => ({
-          type: stroke.type || 'SOLID',
-          color: stroke.color || { r: 0, g: 0, b: 0 },
-          opacity: stroke.opacity,
-          blendMode: stroke.blendMode || 'NORMAL'
-        }));
+        node.strokes = this.processStrokes(data.strokes);
+        
+        // Set stroke properties if available
+        if ('strokeWeight' in node && data.strokeWeight !== undefined) {
+          node.strokeWeight = data.strokeWeight;
+        }
+        if ('strokeAlign' in node && data.strokeAlign) {
+          node.strokeAlign = data.strokeAlign;
+        }
+        if ('strokeCap' in node && data.strokeCap) {
+          node.strokeCap = data.strokeCap;
+        }
+        if ('strokeJoin' in node && data.strokeJoin) {
+          node.strokeJoin = data.strokeJoin;
+        }
+        if ('dashPattern' in node && data.strokeDashes) {
+          node.dashPattern = data.strokeDashes;
+        }
       } catch (error) {
-        console.warn('Error setting strokes:', error);
+        console.warn(`Failed to set strokes for ${node.name}:`, error);
       }
     }
 
-    // Set effects
-    if (data.effects) {
+    // Set effects (shadows, blurs, etc.)
+    if ('effects' in node && data.effects) {
       try {
-        node.effects = data.effects;
+        node.effects = this.processEffects(data.effects);
       } catch (error) {
-        console.warn('Error setting effects:', error);
+        console.warn(`Failed to set effects for ${node.name}:`, error);
       }
     }
 
-    // Set constraints
-    if (data.constraints && 'constraints' in node) {
+    // Set blend mode
+    if ('blendMode' in node && data.blendMode) {
       try {
-        node.constraints = data.constraints;
+        node.blendMode = data.blendMode;
       } catch (error) {
-        console.warn('Error setting constraints:', error);
+        console.warn(`Failed to set blend mode for ${node.name}:`, error);
       }
     }
 
-    // Set clipsContent for frames
-    if ('clipsContent' in node && data.clipsContent !== undefined) {
+    // Set opacity
+    if ('opacity' in node && data.opacity !== undefined) {
+      node.opacity = data.opacity;
+    }
+
+    // Set corner radius for shapes that support it
+    if ('cornerRadius' in node) {
+      if (data.cornerRadius !== undefined) {
+        node.cornerRadius = data.cornerRadius;
+      } else if (data.topLeftRadius !== undefined) {
+        // Handle individual corner radii
+        node.topLeftRadius = data.topLeftRadius;
+        node.topRightRadius = data.topRightRadius;
+        node.bottomLeftRadius = data.bottomLeftRadius;
+        node.bottomRightRadius = data.bottomRightRadius;
+      }
+    }
+  }
+
+  private processFills(fills: any[]): Paint[] {
+    return fills.map(fill => {
+      switch (fill.type) {
+        case 'SOLID':
+          return {
+            type: 'SOLID',
+            color: {
+              r: fill.color.r || 0,
+              g: fill.color.g || 0,
+              b: fill.color.b || 0
+            },
+            opacity: fill.opacity !== undefined ? fill.opacity : 1,
+            blendMode: fill.blendMode || 'NORMAL'
+          };
+
+        case 'GRADIENT_LINEAR':
+        case 'GRADIENT_RADIAL':
+        case 'GRADIENT_ANGULAR':
+        case 'GRADIENT_DIAMOND':
+          return {
+            type: fill.type,
+            gradientStops: fill.gradientStops.map((stop: any) => ({
+              color: {
+                r: stop.color.r || 0,
+                g: stop.color.g || 0,
+                b: stop.color.b || 0,
+                a: stop.color.a || 1
+              },
+              position: stop.position
+            })),
+            opacity: fill.opacity !== undefined ? fill.opacity : 1,
+            blendMode: fill.blendMode || 'NORMAL',
+            gradientTransform: fill.gradientTransform || [[1, 0, 0], [0, 1, 0]]
+          };
+
+        case 'IMAGE':
+          return {
+            type: 'IMAGE',
+            imageHash: fill.imageHash || '',
+            scaleMode: fill.scaleMode || 'FILL',
+            opacity: fill.opacity !== undefined ? fill.opacity : 1,
+            blendMode: fill.blendMode || 'NORMAL',
+            imageTransform: fill.imageTransform || [[1, 0, 0], [0, 1, 0]]
+          };
+
+        default:
+          console.warn(`Unknown fill type: ${fill.type}`);
+          return fill;
+      }
+    });
+  }
+
+  private processStrokes(strokes: any[]): Paint[] {
+    return strokes.map(stroke => {
+      switch (stroke.type) {
+        case 'SOLID':
+          return {
+            type: 'SOLID',
+            color: {
+              r: stroke.color.r || 0,
+              g: stroke.color.g || 0,
+              b: stroke.color.b || 0
+            },
+            opacity: stroke.opacity !== undefined ? stroke.opacity : 1,
+            blendMode: stroke.blendMode || 'NORMAL'
+          };
+
+        case 'GRADIENT_LINEAR':
+        case 'GRADIENT_RADIAL':
+        case 'GRADIENT_ANGULAR':
+        case 'GRADIENT_DIAMOND':
+          return {
+            type: stroke.type,
+            gradientStops: stroke.gradientStops.map((stop: any) => ({
+              color: {
+                r: stop.color.r || 0,
+                g: stop.color.g || 0,
+                b: stop.color.b || 0,
+                a: stop.color.a || 1
+              },
+              position: stop.position
+            })),
+            opacity: stroke.opacity !== undefined ? stroke.opacity : 1,
+            blendMode: stroke.blendMode || 'NORMAL',
+            gradientTransform: stroke.gradientTransform || [[1, 0, 0], [0, 1, 0]]
+          };
+
+        default:
+          console.warn(`Unknown stroke type: ${stroke.type}`);
+          return stroke;
+      }
+    });
+  }
+
+  private processEffects(effects: any[]): Effect[] {
+    return effects.map(effect => {
+      switch (effect.type) {
+        case 'DROP_SHADOW':
+        case 'INNER_SHADOW':
+          return {
+            type: effect.type,
+            color: {
+              r: effect.color.r || 0,
+              g: effect.color.g || 0,
+              b: effect.color.b || 0,
+              a: effect.color.a || 1
+            },
+            offset: {
+              x: effect.offset.x || 0,
+              y: effect.offset.y || 0
+            },
+            radius: effect.radius || 0,
+            spread: effect.spread || 0,
+            visible: effect.visible !== undefined ? effect.visible : true,
+            blendMode: effect.blendMode || 'NORMAL'
+          };
+
+        case 'LAYER_BLUR':
+        case 'BACKGROUND_BLUR':
+          return {
+            type: effect.type,
+            radius: effect.radius || 0,
+            visible: effect.visible !== undefined ? effect.visible : true
+          };
+
+        default:
+          console.warn(`Unknown effect type: ${effect.type}`);
+          return effect;
+      }
+    });
+  }
+}
+
+// Helper function to convert font weight to style
+function getFontStyle(weight: number): string {
+  if (weight <= 100) return "Thin";
+  if (weight <= 200) return "ExtraLight";
+  if (weight <= 300) return "Light";
+  if (weight <= 400) return "Regular";
+  if (weight <= 500) return "Medium";
+  if (weight <= 600) return "SemiBold";
+  if (weight <= 700) return "Bold";
+  if (weight <= 800) return "ExtraBold";
+  return "Black";
+}
+
+// 文本节点
+class TextNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    const node = figma.createText();
+    this.setBaseProperties(node, data);
+    
+    try {
+      // 加载字体
+      await this.loadFont(data);
+      
+      // 写入文本
+      if (data.characters) {
+        node.characters = data.characters;
+      }
+      
+      // 导入文本样式
+      await this.applyTextStyles(node, data);
+      
+      // 导入背景、边框等容器样式
+      this.setAppearance(node, data);
+      
+      return node;
+    } catch (error) {
+      console.error('Error creating text node:', error);
+      return node;
+    }
+  }
+
+  private async loadFont(data: any): Promise<void> {
+    try {
+      let fontName: FontName;
+
+      // Try to get font from style or direct properties
+      if (data.style?.fontName) {
+        fontName = data.style.fontName;
+      } else if (data.fontName) {
+        fontName = data.fontName;
+      } else {
+        // Default font
+        fontName = { family: "Inter", style: "Regular" };
+      }
+
+      await figma.loadFontAsync(fontName);
+    } catch (error) {
+      console.warn('Failed to load specified font, falling back to Inter:', error);
+      // Fallback to Inter
+      await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+    }
+  }
+
+  private async applyTextStyles(node: TextNode, data: any): Promise<void> {
+    try {
+      // Get style object combining direct properties and style object
+      const style = { ...data.style, ...data };
+
+      // Font properties
+      if (style.fontName) {
+        node.fontName = style.fontName;
+      }
+
+      if (style.fontSize) {
+        node.fontSize = style.fontSize;
+      }
+
+      // Text alignment
+      if (style.textAlignHorizontal) {
+        node.textAlignHorizontal = style.textAlignHorizontal;
+      }
+
+      if (style.textAlignVertical) {
+        node.textAlignVertical = style.textAlignVertical;
+      }
+
+      // Line height
+      if (style.lineHeight) {
+        if (typeof style.lineHeight === 'object') {
+          node.lineHeight = style.lineHeight;
+        } else {
+          node.lineHeight = { value: style.lineHeight, unit: 'PIXELS' };
+        }
+      }
+
+      // Letter spacing
+      if (style.letterSpacing) {
+        if (typeof style.letterSpacing === 'object') {
+          node.letterSpacing = style.letterSpacing;
+        } else {
+          node.letterSpacing = { value: style.letterSpacing, unit: 'PIXELS' };
+        }
+      }
+
+      // Text case
+      if (style.textCase) {
+        node.textCase = style.textCase;
+      }
+
+      // Text decoration
+      if (style.textDecoration) {
+        node.textDecoration = style.textDecoration;
+      }
+
+      // Paragraph spacing
+      if (style.paragraphSpacing) {
+        node.paragraphSpacing = style.paragraphSpacing;
+      }
+
+      // Paragraph indent
+      if (style.paragraphIndent) {
+        node.paragraphIndent = style.paragraphIndent;
+      }
+
+      // Text auto resize
+      if (style.textAutoResize) {
+        node.textAutoResize = style.textAutoResize;
+      }
+
+      // Font features
+      if (style.fontFeatures) {
+        for (const [feature, value] of Object.entries(style.fontFeatures)) {
+          try {
+            // @ts-ignore: Figma's type definitions might not include all font features
+            node.setFontFeatures([[feature, value]]);
+          } catch (error) {
+            console.warn(`Failed to set font feature ${feature}:`, error);
+          }
+        }
+      }
+
+      // OpenType features
+      if (style.openTypeFeatures) {
+        for (const [feature, value] of Object.entries(style.openTypeFeatures)) {
+          try {
+            // @ts-ignore: Figma's type definitions might not include all OpenType features
+            node.setOpenTypeFeatures([[feature, value]]);
+          } catch (error) {
+            console.warn(`Failed to set OpenType feature ${feature}:`, error);
+          }
+        }
+      }
+
+      // Text style variants
+      if (style.textStyleId) {
+        try {
+          node.textStyleId = style.textStyleId;
+        } catch (error) {
+          console.warn('Failed to apply text style:', error);
+        }
+      }
+
+      // Hyperlink
+      if (style.hyperlink) {
+        try {
+          node.hyperlink = style.hyperlink;
+        } catch (error) {
+          console.warn('Failed to set hyperlink:', error);
+        }
+      }
+
+      // Mixed styles
+      if (style.textSegments) {
+        try {
+          // Store original text
+          const fullText = node.characters;
+          
+          // Clear existing text
+          node.characters = '';
+          
+          // Apply segments
+          for (const segment of style.textSegments) {
+            const start = node.characters.length;
+            node.insertCharacters(start, segment.characters);
+            
+            // Apply segment-specific styles
+            if (segment.fontSize) {
+              node.setRangeFontSize(start, start + segment.characters.length, segment.fontSize);
+            }
+            if (segment.fontName) {
+              await figma.loadFontAsync(segment.fontName);
+              node.setRangeFontName(start, start + segment.characters.length, segment.fontName);
+            }
+            if (segment.fills) {
+              node.setRangeFills(start, start + segment.characters.length, this.processFills(segment.fills));
+            }
+            if (segment.textDecoration) {
+              node.setRangeTextDecoration(start, start + segment.characters.length, segment.textDecoration);
+            }
+            if (segment.textCase) {
+              node.setRangeTextCase(start, start + segment.characters.length, segment.textCase);
+            }
+            if (segment.letterSpacing) {
+              node.setRangeLetterSpacing(start, start + segment.characters.length, segment.letterSpacing);
+            }
+            if (segment.lineHeight) {
+              node.setRangeLineHeight(start, start + segment.characters.length, segment.lineHeight);
+            }
+            if (segment.hyperlink) {
+              node.setRangeHyperlink(start, start + segment.characters.length, segment.hyperlink);
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to apply text segments:', error);
+          // Fallback to simple text
+          node.characters = data.characters || '';
+        }
+      }
+
+    } catch (error) {
+      console.error('Error applying text styles:', error);
+    }
+  }
+}
+
+// Document node creator
+class DocumentNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    const node = figma.createFrame();
+    this.setBaseProperties(node, data);
+    
+    // Document should not have fills
+    node.fills = [];
+    
+    // Set a large size initially - will be adjusted based on children
+    node.resize(3000, 2000);
+    
+    return node;
+  }
+}
+
+// Canvas node creator
+class CanvasNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    const node = figma.createFrame();
+    this.setBaseProperties(node, data);
+    
+    // Canvas should not have fills
+    node.fills = [];
+    node.layoutMode = "NONE";
+    
+    return node;
+  }
+}
+
+// Frame node creator
+class FrameNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    const node = figma.createFrame();
+    
+    // Set base properties
+    this.setBaseProperties(node, data);
+    
+    // Set layout properties
+    if (data.layoutMode) {
+      node.layoutMode = data.layoutMode;
+      if (data.primaryAxisSizingMode) node.primaryAxisSizingMode = data.primaryAxisSizingMode;
+      if (data.counterAxisSizingMode) node.counterAxisSizingMode = data.counterAxisSizingMode;
+      if (data.primaryAxisAlignItems) node.primaryAxisAlignItems = data.primaryAxisAlignItems;
+      if (data.counterAxisAlignItems) node.counterAxisAlignItems = data.counterAxisAlignItems;
+      if (data.itemSpacing !== undefined) node.itemSpacing = data.itemSpacing;
+    }
+
+    // Set padding
+    if (data.paddingLeft !== undefined) node.paddingLeft = data.paddingLeft;
+    if (data.paddingRight !== undefined) node.paddingRight = data.paddingRight;
+    if (data.paddingTop !== undefined) node.paddingTop = data.paddingTop;
+    if (data.paddingBottom !== undefined) node.paddingBottom = data.paddingBottom;
+
+    // Set clipsContent
+    if (data.clipsContent !== undefined) {
       node.clipsContent = data.clipsContent;
     }
 
+    // Set appearance
+    this.setAppearance(node, data);
+    
+    return node;
+  }
+}
+
+// Rectangle node creator
+class RectangleNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    const node = figma.createRectangle();
+    
+    this.setBaseProperties(node, data);
+    
+    // Set corner radius
+    if (data.cornerRadius !== undefined) {
+      node.cornerRadius = data.cornerRadius;
+    }
+    
+    this.setAppearance(node, data);
+    
+    return node;
+  }
+}
+
+// Group node creator
+class GroupNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    // Create a temporary frame that will be converted to group after children are added
+    const node = figma.createFrame();
+    this.setBaseProperties(node, data);
+    
+    // Groups don't have fills
+    node.fills = [];
+    
+    return node;
+  }
+}
+
+// Component node creator
+class ComponentNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    const node = figma.createComponent();
+    this.setBaseProperties(node, data);
+    this.setAppearance(node, data);
+    return node;
+  }
+}
+
+// Instance node creator
+class InstanceNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    // Since we can't create instances without main components,
+    // create a frame as a placeholder
+    const node = figma.createFrame();
+    this.setBaseProperties(node, data);
+    this.setAppearance(node, data);
+    return node;
+  }
+}
+
+// Vector node creator
+class VectorNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    const node = figma.createVector();
+    this.setBaseProperties(node, data);
+    this.setAppearance(node, data);
+    return node;
+  }
+}
+
+// Boolean operation node creator
+class BooleanOperationNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    const node = figma.createBooleanOperation();
+    this.setBaseProperties(node, data);
+    this.setAppearance(node, data);
+    return node;
+  }
+}
+
+// Ellipse node creator
+class EllipseNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    const node = figma.createEllipse();
+    this.setBaseProperties(node, data);
+    this.setAppearance(node, data);
+    return node;
+  }
+}
+
+// Factory for creating nodes
+class NodeFactory {
+  private creators: Map<string, NodeCreator>;
+
+  constructor() {
+    this.creators = new Map();
+    this.creators.set('DOCUMENT', new DocumentNodeCreator());
+    this.creators.set('CANVAS', new CanvasNodeCreator());
+    this.creators.set('FRAME', new FrameNodeCreator());
+    this.creators.set('RECTANGLE', new RectangleNodeCreator());
+    this.creators.set('TEXT', new TextNodeCreator());
+    this.creators.set('GROUP', new GroupNodeCreator());
+    this.creators.set('COMPONENT', new ComponentNodeCreator());
+    this.creators.set('INSTANCE', new InstanceNodeCreator());
+    this.creators.set('VECTOR', new VectorNodeCreator());
+    this.creators.set('BOOLEAN_OPERATION', new BooleanOperationNodeCreator());
+    this.creators.set('ELLIPSE', new EllipseNodeCreator());
+  }
+
+  async createNode(type: string, data: any): Promise<SceneNode | null> {
+    const creator = this.creators.get(type);
+    if (!creator) {
+      console.warn(`No creator found for node type: ${type}`);
+      return null;
+    }
+    return creator.createNode(data);
+  }
+}
+
+// Main function to import nodes
+async function importNode(data: any, parent: BaseNode & ChildrenMixin, parentBounds?: { x: number, y: number }): Promise<SceneNode | null> {
+  try {
+    const factory = new NodeFactory();
+    const node = await factory.createNode(data.type, data);
+    
+    if (!node) {
+      console.warn(`Failed to create node of type: ${data.type}`);
+      return null;
+    }
+
     // Add to parent
-    if (parent && node) {
+    if (parent) {
       parent.appendChild(node);
     }
 
+    // Set geometry and get new bounds for children
+    const creator = new BaseNodeCreator();
+    const nodeBounds = creator.setGeometry(node, data, parentBounds);
+
     // Process children
-    if (data.children && node && node.type !== 'TEXT' && 'appendChild' in node) {
+    if (data.children && 'appendChild' in node && data.type !== 'TEXT') {
       for (const childData of data.children) {
-        await createNodeFromJson(childData, node as BaseNode & ChildrenMixin);
+        await importNode(childData, node as BaseNode & ChildrenMixin, nodeBounds);
+      }
+    }
+
+    // Convert frame to group if needed
+    if (data.type === 'GROUP' && node.type === 'FRAME') {
+      try {
+        const children = [...node.children];
+        if (children.length > 0) {
+          const group = figma.group(children, parent);
+          // Copy over properties that groups can have
+          group.name = node.name;
+          group.opacity = node.opacity;
+          group.visible = node.visible;
+          group.locked = node.locked;
+          group.rotation = node.rotation;
+          group.x = node.x;
+          group.y = node.y;
+          
+          node.remove();
+          return group;
+        }
+      } catch (error) {
+        console.warn(`Error converting frame to group: ${error}`);
       }
     }
 
     return node;
   } catch (error) {
-    console.error('Error creating node:', error);
+    console.error('Error importing node:', error);
     return null;
   }
-};
+}
+
+// Entry point for importing Figma JSON
+async function importFigmaJSON(jsonData: any): Promise<void> {
+  try {
+    // Create a container frame for the imported content
+    const containerFrame = figma.createFrame();
+    containerFrame.name = jsonData.name || 'Imported Design';
+    
+    // Set initial size - will be adjusted based on content
+    containerFrame.resize(3000, 2000);
+    containerFrame.fills = [];
+    
+    // Add to current page
+    figma.currentPage.appendChild(containerFrame);
+    
+    // Initial bounds for the container
+    const containerBounds = { x: 0, y: 0 };
+    
+    if (jsonData.document) {
+      await importNode(jsonData.document, containerFrame, containerBounds);
+    } else if (Array.isArray(jsonData)) {
+      for (const nodeData of jsonData) {
+        await importNode(nodeData, containerFrame, containerBounds);
+      }
+    } else {
+      await importNode(jsonData, containerFrame, containerBounds);
+    }
+
+    // Select and zoom to the imported content
+    figma.currentPage.selection = [containerFrame];
+    figma.viewport.scrollAndZoomIntoView([containerFrame]);
+    
+  } catch (error) {
+    console.error('Error importing Figma JSON:', error);
+    throw error;
+  }
+}
 
 const standardMode = async () => {
   figma.showUI(__html__, { width: 450, height: 550, themeColors: true });
@@ -407,92 +921,24 @@ const standardMode = async () => {
         });
       });
     } else if (msg.type === "import-figma-json") {
-      try {
-        const data = msg.data;
-        if (!data) {
-          throw new Error('No data provided');
-        }
+      const data = msg.data;
+      if (!data) {
+        throw new Error('No data provided');
+      }
 
-        // 检查是否是完整的文档数据
-        const isDocument = data.document || (data.type === 'DOCUMENT');
-        const documentData = isDocument ? (data.document || data) : data;
-
-        // 创建一个新的Frame作为导入内容的容器
-        const containerFrame = figma.createFrame();
-        
-        // 设置容器名称
-        if (isDocument && data.name) {
-          containerFrame.name = `Import: ${data.name}`;
-        } else {
-          containerFrame.name = documentData.name || '导入的设计';
-        }
-
-        // 设置容器尺寸
-        let containerWidth = 800;
-        let containerHeight = 600;
-
-        // 如果是文档数据，尝试从子节点计算合适的尺寸
-        if (isDocument && documentData.children) {
-          const childrenBounds = documentData.children.reduce((bounds: any, child: any) => {
-            const childRight = (child.x || 0) + (child.width || 0);
-            const childBottom = (child.y || 0) + (child.height || 0);
-            return {
-              right: Math.max(bounds.right, childRight),
-              bottom: Math.max(bounds.bottom, childBottom)
-            };
-          }, { right: 0, bottom: 0 });
-
-          containerWidth = Math.max(800, childrenBounds.right + 100);
-          containerHeight = Math.max(600, childrenBounds.bottom + 100);
-        } else if (documentData.width && documentData.height) {
-          containerWidth = documentData.width;
-          containerHeight = documentData.height;
-        }
-
-        containerFrame.resize(containerWidth, containerHeight);
-
-        // 将容器添加到当前页面
-        figma.currentPage.appendChild(containerFrame);
-
-        // 处理节点数据
-        if (isDocument && documentData.children) {
-          // 如果是文档数据，处理其子节点
-          for (const childData of documentData.children) {
-            // 如果是 CANVAS 类型，直接处理其子节点
-            if (childData.type === 'CANVAS' && childData.children) {
-              for (const canvasChild of childData.children) {
-                await createNodeFromJson(canvasChild, containerFrame);
-              }
-            } else {
-              await createNodeFromJson(childData, containerFrame);
-            }
-          }
-        } else if (Array.isArray(documentData)) {
-          // 如果是节点数组
-          for (const nodeData of documentData) {
-            await createNodeFromJson(nodeData, containerFrame);
-          }
-        } else {
-          // 如果是单个节点
-          await createNodeFromJson(documentData, containerFrame);
-        }
-
-        // 选中新创建的容器
-        figma.currentPage.selection = [containerFrame];
-        figma.viewport.scrollAndZoomIntoView([containerFrame]);
-
+      importFigmaJSON(data).then(() => {
         // 发送成功消息
         figma.ui.postMessage({
           type: "success",
-          data: "JSON数据导入成功",
+          data: "Figma文件导入成功",
         });
-      } catch (error) {
-        console.error('Error importing JSON:', error);
+      }).catch((error) => {
+        console.error('Error importing Figma JSON:', error);
         figma.ui.postMessage({
           type: "error",
-          data: `导入JSON失败: ${error.message}`,
+          data: `导入Figma文件失败: ${error.message}`,
         });
-      }
+      });
     }
   });
 };
