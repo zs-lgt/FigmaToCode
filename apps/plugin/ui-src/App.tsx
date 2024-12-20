@@ -19,6 +19,7 @@ interface AppState {
     contrastBlack: number;
   }[];
   gradients: { cssPreview: string; exportedValue: string }[];
+  figmaFileData: any;
 }
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
     preferences: null,
     colors: [],
     gradients: [],
+    figmaFileData: null,
   });
 
   const rootStyles = getComputedStyle(document.documentElement);
@@ -41,6 +43,14 @@ export default function App() {
     window.onmessage = async (event: MessageEvent) => {
       const message = event.data.pluginMessage;
       switch (message.type) {
+        case "figma-file-data":
+          setState(prevState => ({
+            ...prevState,
+            figmaFileData: message.data,
+          }));
+          // 处理获取到的Figma文件数据
+          console.log("Figma file data:", message.data);
+          break;
         case "upload-image":
           try {
             // 从 base64 字符串中提取实际的 base64 数据
@@ -82,7 +92,13 @@ export default function App() {
                   // 提取 className 和其他属性
                   const classMatch = (group1 + group2).match(/className="([^"]*)"/) || [];
                   const className = classMatch[1] || '';
-                  return `<img id="${message.nodeId}" src="${imageUrl}" className="${className}" />`;
+                  return `<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <img id="${message.nodeId}" src="${imageUrl}" className="${className}" />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <button onClick={() => handleDeleteNode('${message.nodeId}')} style={{ padding: '4px 8px', background: '#ff4d4f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>删除</button>
+                      <button onClick={() => handleDuplicateNode('${message.nodeId}')} style={{ padding: '4px 8px', background: '#1890ff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>复制</button>
+                    </div>
+                  </div>`;
                 }
               );
               
@@ -119,12 +135,12 @@ export default function App() {
             
             // 添加节点信息文件
             if (message.data.nodesInfo) {
-              zip.file("nodes.json", message.data.nodesInfo);
+              zip.file("ui.json", message.data.nodesInfo);
             }
             
             // 添加描述信息文件
             if (message.data.description) {
-              zip.file("description.json", JSON.stringify({ description: message.data.description }, null, 2));
+              zip.file("ux.json", JSON.stringify({ description: message.data.description }, null, 2));
             }
             
             // 添加图片文件
@@ -211,6 +227,20 @@ export default function App() {
       window.onmessage = null;
     };
   }, []);
+
+  const handleDeleteNode = (nodeId: string) => {
+    parent.postMessage(
+      { pluginMessage: { type: "delete-node", nodeId } },
+      "*"
+    );
+  };
+
+  const handleDuplicateNode = (nodeId: string) => {
+    parent.postMessage(
+      { pluginMessage: { type: "duplicate-node", nodeId } },
+      "*"
+    );
+  };
 
   useEffect(() => {
     if (state.selectedFramework === null) {
