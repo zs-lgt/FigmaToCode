@@ -94,10 +94,6 @@ export default function App() {
                   const className = classMatch[1] || '';
                   return `<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <img id="${message.nodeId}" src="${imageUrl}" className="${className}" />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <button onClick={() => handleDeleteNode('${message.nodeId}')} style={{ padding: '4px 8px', background: '#ff4d4f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>删除</button>
-                      <button onClick={() => handleDuplicateNode('${message.nodeId}')} style={{ padding: '4px 8px', background: '#1890ff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>复制</button>
-                    </div>
                   </div>`;
                 }
               );
