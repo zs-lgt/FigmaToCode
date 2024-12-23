@@ -101,26 +101,27 @@ class BaseNodeCreator implements NodeCreator {
   }
 
   setGeometry(node: SceneNode, data: any, parentBounds?: { x: number, y: number }): { x: number, y: number } {
-    let width = 0;
-    let height = 0;
+    let width = 100;
+    let height = 100;
     let x = 0;
     let y = 0;
 
     // Get absolute bounds
     if (data.absoluteBoundingBox) {
-      width = Math.abs(data.absoluteBoundingBox.width || 0);
-      height = Math.abs(data.absoluteBoundingBox.height || 0);
+      width = Math.max(1, Math.abs(data.absoluteBoundingBox.width || 0));
+      height = Math.max(1, Math.abs(data.absoluteBoundingBox.height || 0));
       x = data.absoluteBoundingBox.x || 0;
       y = data.absoluteBoundingBox.y || 0;
-    } else if (data.size) {
-      width = data.size.width || 0;
-      height = data.size.height || 0;
+    } else {
+      // Fallback to individual properties
+      width = Math.max(1, Math.abs(data.size?.width || data.width || width));
+      height = Math.max(1, Math.abs(data.size?.height || data.height || height));
       x = data.x || 0;
       y = data.y || 0;
     }
 
-    // Apply size if valid
-    if (width > 0 && height > 0) {
+    // Apply size if supported
+    if ('resize' in node) {
       try {
         node.resize(width, height);
       } catch (error) {
@@ -134,15 +135,16 @@ class BaseNodeCreator implements NodeCreator {
       y = y - parentBounds.y;
     }
 
-    // Apply position
-    node.x = x;
-    node.y = y;
+    // Apply position if supported
+    if ('x' in node) node.x = x;
+    if ('y' in node) node.y = y;
 
-    if (data.rotation) {
+    // Apply rotation if available
+    if ('rotation' in node && data.rotation !== undefined) {
       node.rotation = data.rotation;
     }
 
-    // Return the node's bounds for child positioning
+    // Return the absolute bounds for child positioning
     return {
       x: x + (parentBounds?.x || 0),
       y: y + (parentBounds?.y || 0)
@@ -819,28 +821,89 @@ async function importNode(data: any, parent: BaseNode & ChildrenMixin, parentBou
 // Entry point for importing Figma JSON
 async function importFigmaJSON(jsonData: any): Promise<void> {
   try {
+    // Get the actual content to import (skip document and canvas layers)
+    let contentToImport: any[] = [];
+    
+    if (jsonData.document?.children) {
+      // If we have a document, look for actual content in its children
+      for (const child of jsonData.document.children) {
+        if (child.type === 'CANVAS' && child.children) {
+          // If it's a canvas, add its children
+          contentToImport.push(...child.children);
+        } else {
+          // If it's not a canvas, add it directly
+          contentToImport.push(child);
+        }
+      }
+    } else if (Array.isArray(jsonData)) {
+      contentToImport = jsonData;
+    } else {
+      contentToImport = [jsonData];
+    }
+
     // Create a container frame for the imported content
     const containerFrame = figma.createFrame();
     containerFrame.name = jsonData.name || 'Imported Design';
     
-    // Set initial size - will be adjusted based on content
-    containerFrame.resize(3000, 2000);
+    // Find the bounds of the content
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    // Helper function to update bounds from absoluteBoundingBox
+    const updateBounds = (box: any) => {
+      if (box) {
+        minX = Math.min(minX, box.x);
+        minY = Math.min(minY, box.y);
+        maxX = Math.max(maxX, box.x + (box.width || 0));
+        maxY = Math.max(maxY, box.y + (box.height || 0));
+      }
+    };
+
+    // Helper function to recursively find bounds
+    const findBounds = (node: any) => {
+      if (node.absoluteBoundingBox) {
+        updateBounds(node.absoluteBoundingBox);
+      }
+      if (node.children) {
+        node.children.forEach(findBounds);
+      }
+    };
+
+    // Find bounds in the content
+    contentToImport.forEach(findBounds);
+
+    // If no bounds found, use default size
+    if (minX === Infinity) {
+      minX = 0;
+      minY = 0;
+      maxX = 3000;
+      maxY = 2000;
+    }
+
+    // Add padding
+    const padding = 100;
+    minX -= padding;
+    minY -= padding;
+    maxX += padding;
+    maxY += padding;
+
+    // Set container frame size and position
+    containerFrame.resize(maxX - minX, maxY - minY);
+    containerFrame.x = minX;
+    containerFrame.y = minY;
     containerFrame.fills = [];
     
     // Add to current page
     figma.currentPage.appendChild(containerFrame);
     
     // Initial bounds for the container
-    const containerBounds = { x: 0, y: 0 };
+    const containerBounds = { x: minX, y: minY };
     
-    if (jsonData.document) {
-      await importNode(jsonData.document, containerFrame, containerBounds);
-    } else if (Array.isArray(jsonData)) {
-      for (const nodeData of jsonData) {
-        await importNode(nodeData, containerFrame, containerBounds);
-      }
-    } else {
-      await importNode(jsonData, containerFrame, containerBounds);
+    // Import all content
+    for (const nodeData of contentToImport) {
+      await importNode(nodeData, containerFrame, containerBounds);
     }
 
     // Select and zoom to the imported content
