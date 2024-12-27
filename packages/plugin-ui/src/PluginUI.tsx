@@ -83,6 +83,14 @@ export const PluginUI = (props: PluginUIProps) => {
     }
   };
 
+  const handleExportNodesClick = () => {
+    parent.postMessage({ 
+      pluginMessage: { 
+        type: 'export-nodes'
+      }
+    }, '*');
+  };
+
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
@@ -117,17 +125,12 @@ export const PluginUI = (props: PluginUIProps) => {
         >
           导入JSON
         </button>
+
         <button
-          className="px-3 py-1 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md shadow-sm"
-          onClick={handleDeleteNode}
+          onClick={handleExportNodesClick}
+          className="ml-2 flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
         >
-          删除节点
-        </button>
-        <button
-          className="px-3 py-1 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm"
-          onClick={handleDuplicateNode}
-        >
-          复制节点
+          导出设计信息
         </button>
       </div>
 
@@ -426,14 +429,6 @@ export const CodePanel = (props: {
     window.open("https://frontend.myhexin.com/kingfisher/collector/html/kamis-comp-create/?hexinMatrix=1&&kacreate=1", "_blank");
   };
 
-  const handleExportNodesClick = () => {
-    parent.postMessage({ 
-      pluginMessage: { 
-        type: 'export-nodes'
-      } 
-    }, '*');
-  };
-
   if (emptySelection) {
     return (
       <div className="flex flex-col space-y-2 m-auto items-center justify-center p-4 {sectionStyle}">
@@ -461,12 +456,6 @@ export const CodePanel = (props: {
               }`}
             >
               导出到KAmis
-            </button>
-            <button
-              onClick={handleExportNodesClick}
-              className="ml-2 flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-            >
-              导出设计
             </button>
           </div>
         </div>
