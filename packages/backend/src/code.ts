@@ -73,6 +73,75 @@ export const run = async (settings: PluginSettings) => {
   });
 };
 
+// 需要保留的关键属性列表
+const ESSENTIAL_PROPERTIES = {
+  common: ['id', 'name', 'type', 'children'],
+  layout: ['x', 'y', 'width', 'height', 'layoutMode', 'primaryAxisAlignItems', 'counterAxisAlignItems', 'padding', 'itemSpacing'],
+  text: ['characters', 'fontSize', 'fontName', 'textAlignHorizontal', 'textAutoResize', 'textCase', 'textDecoration', 'letterSpacing', 'lineHeight'],
+  style: ['fills', 'strokes', 'effects', 'cornerRadius', 'strokeWeight'],
+  constraints: ['constraints'],
+  image: ['imageHash']
+};
+
+function cleanExportData(obj: any): any {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  // 处理数组
+  if (Array.isArray(obj)) {
+    const cleanArray = obj
+      .map(item => cleanExportData(item))
+      .filter(item => item !== undefined && item !== null);
+    return cleanArray.length ? cleanArray : undefined;
+  }
+
+  const cleanObj: any = {};
+  
+  // 根据节点类型确定需要保留的属性
+  const essentialProps = new Set([
+    ...ESSENTIAL_PROPERTIES.common,
+    ...(obj.type === 'TEXT' ? ESSENTIAL_PROPERTIES.text : []),
+    ...(obj.type === 'FRAME' || obj.type === 'GROUP' || obj.type === 'INSTANCE' ? ESSENTIAL_PROPERTIES.layout : []),
+    ...(obj.fills?.length > 0 || obj.strokes?.length > 0 ? ESSENTIAL_PROPERTIES.style : []),
+    ...(obj.imageHash ? ESSENTIAL_PROPERTIES.image : [])
+  ]);
+
+  // 只保留必要的属性
+  for (const [key, value] of Object.entries(obj)) {
+    if (!essentialProps.has(key)) continue;
+
+    // 跳过空值
+    if (value === null || value === undefined) continue;
+    if (value === '') continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) continue;
+
+    // 处理特殊属性
+    if (key === 'style') {
+      // 只保留必要的样式属性
+      const cleanStyle = {};
+      for (const styleKey of ESSENTIAL_PROPERTIES.style) {
+        if (value[styleKey] !== undefined) {
+          cleanStyle[styleKey] = value[styleKey];
+        }
+      }
+      if (Object.keys(cleanStyle).length > 0) {
+        cleanObj[key] = cleanStyle;
+      }
+      continue;
+    }
+
+    // 递归清理子属性
+    const cleanValue = cleanExportData(value);
+    if (cleanValue !== undefined) {
+      cleanObj[key] = cleanValue;
+    }
+  }
+
+  return Object.keys(cleanObj).length ? cleanObj : undefined;
+}
+
 figma.ui.onmessage = async (msg) => {
   if (msg.type === "export-nodes") {
     const nodes = figma.currentPage.children;
@@ -98,7 +167,7 @@ figma.ui.onmessage = async (msg) => {
       try {
         const imageBase64 = await getNodeExportImage(node.id);
         // 保存节点信息（不包含图片数据）
-        exportedNodes.push(node);
+        exportedNodes.push(cleanExportData(node));
         // 保存图片数据
         if (imageBase64) {
           exportedImages.push({
@@ -115,7 +184,7 @@ figma.ui.onmessage = async (msg) => {
     figma.ui.postMessage({
       type: "export-nodes-result",
       data: {
-        nodesInfo: JSON.stringify(exportedNodes, null, 2),
+        nodesInfo: JSON.stringify(cleanExportData(exportedNodes), null, 2),
         description: description,
         images: exportedImages
       }
@@ -150,7 +219,7 @@ figma.ui.onmessage = async (msg) => {
         };
       })
     );
-    const nodesInfoStr = JSON.stringify(filteredNodesInfo, null, 2);
+    const nodesInfoStr = JSON.stringify(cleanExportData(filteredNodesInfo), null, 2);
     
     console.log('JSON字符串:', nodesInfoStr);
     figma.ui.postMessage({

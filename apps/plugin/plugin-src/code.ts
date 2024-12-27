@@ -378,7 +378,7 @@ class TextNodeCreator extends BaseNodeCreator {
     
     try {
       // 加载字体
-      await this.loadFont(data);
+      const loadedFont = await this.loadFont(data);
       
       // 写入文本
       if (data.characters) {
@@ -398,7 +398,7 @@ class TextNodeCreator extends BaseNodeCreator {
     }
   }
 
-  private async loadFont(data: any): Promise<void> {
+  private async loadFont(data: any): Promise<FontName> {
     try {
       let fontName: FontName;
 
@@ -412,134 +412,115 @@ class TextNodeCreator extends BaseNodeCreator {
         fontName = { family: "Inter", style: "Regular" };
       }
 
-      await figma.loadFontAsync(fontName);
-    } catch (error) {
-      console.warn('Failed to load specified font, falling back to Inter:', error);
+      // Get available fonts
+      const availableFonts = await figma.listAvailableFontsAsync();
+      
+      // Try to find exact match first
+      let matchedFont = availableFonts.find(font => 
+        font.fontName.family === fontName.family && 
+        font.fontName.style === fontName.style
+      );
+
+      // If no exact match, try to find a similar font
+      if (!matchedFont && fontName.family.includes("SF Pro")) {
+        // Try variations of SF Pro font names
+        const sfProVariants = ["SF Pro", "SF Pro Text", "SF Pro Display"];
+        for (const variant of sfProVariants) {
+          matchedFont = availableFonts.find(font =>
+            font.fontName.family === variant &&
+            font.fontName.style === fontName.style
+          );
+          if (matchedFont) break;
+        }
+
+        // If still no match, try to match style
+        if (!matchedFont) {
+          // Map common style names
+          const styleMap: { [key: string]: string[] } = {
+            "Semibold": ["SemiBold", "Semi Bold", "Medium"],
+            "Medium": ["Medium", "Regular"],
+            "Bold": ["Bold", "Heavy"],
+            "Regular": ["Regular", "Normal"]
+          };
+
+          const targetStyle = fontName.style;
+          const alternativeStyles = styleMap[targetStyle] || [targetStyle];
+
+          for (const variant of sfProVariants) {
+            for (const style of alternativeStyles) {
+              matchedFont = availableFonts.find(font =>
+                font.fontName.family === variant &&
+                font.fontName.style === style
+              );
+              if (matchedFont) break;
+            }
+            if (matchedFont) break;
+          }
+        }
+      }
+
+      // If we found a matching font, try to load it
+      if (matchedFont) {
+        try {
+          await figma.loadFontAsync(matchedFont.fontName);
+          console.log(`Successfully loaded font: ${matchedFont.fontName.family} ${matchedFont.fontName.style}`);
+          return matchedFont.fontName;
+        } catch (error) {
+          console.warn(`Failed to load matched font ${matchedFont.fontName.family} ${matchedFont.fontName.style}, falling back to Inter:`, error);
+        }
+      } else {
+        console.warn(`No matching font found for ${fontName.family} ${fontName.style}, falling back to Inter`);
+      }
+
       // Fallback to Inter
-      await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+      const fallbackFont = { family: "Inter", style: "Regular" };
+      await figma.loadFontAsync(fallbackFont);
+      return fallbackFont;
+
+    } catch (error) {
+      console.warn('Font loading error, falling back to Inter:', error);
+      const fallbackFont = { family: "Inter", style: "Regular" };
+      await figma.loadFontAsync(fallbackFont);
+      return fallbackFont;
     }
   }
 
-  private async applyTextStyles(node: TextNode, data: any): Promise<void> {
+  async applyTextStyles(node: TextNode, data: any) {
     try {
       // Get style object combining direct properties and style object
       const style = { ...data.style, ...data };
 
-      // Font properties
+      // Load and set font first
       if (style.fontName) {
-        node.fontName = style.fontName;
+        const loadedFont = await this.loadFont({ fontName: style.fontName });
+        node.fontName = loadedFont;
       }
 
-      if (style.fontSize) {
-        node.fontSize = style.fontSize;
-      }
-
-      // Text alignment
-      if (style.textAlignHorizontal) {
-        node.textAlignHorizontal = style.textAlignHorizontal;
-      }
-
-      if (style.textAlignVertical) {
-        node.textAlignVertical = style.textAlignVertical;
-      }
-
-      // Line height
-      if (style.lineHeight) {
-        if (typeof style.lineHeight === 'object') {
-          node.lineHeight = style.lineHeight;
-        } else {
-          node.lineHeight = { value: style.lineHeight, unit: 'PIXELS' };
-        }
-      }
-
-      // Letter spacing
-      if (style.letterSpacing) {
-        if (typeof style.letterSpacing === 'object') {
-          node.letterSpacing = style.letterSpacing;
-        } else {
-          node.letterSpacing = { value: style.letterSpacing, unit: 'PIXELS' };
-        }
-      }
-
-      // Text case
-      if (style.textCase) {
-        node.textCase = style.textCase;
-      }
-
-      // Text decoration
-      if (style.textDecoration) {
-        node.textDecoration = style.textDecoration;
-      }
-
-      // Paragraph spacing
-      if (style.paragraphSpacing) {
-        node.paragraphSpacing = style.paragraphSpacing;
-      }
-
-      // Paragraph indent
-      if (style.paragraphIndent) {
-        node.paragraphIndent = style.paragraphIndent;
-      }
-
-      // Text auto resize
+      // Set text auto resize first to ensure proper width calculation
       if (style.textAutoResize) {
         node.textAutoResize = style.textAutoResize;
+      } else {
+        // Default to WIDTH_AND_HEIGHT for title-like text
+        node.textAutoResize = "WIDTH_AND_HEIGHT";
       }
 
-      // Font features
-      if (style.fontFeatures) {
-        for (const [feature, value] of Object.entries(style.fontFeatures)) {
-          try {
-            // @ts-ignore: Figma's type definitions might not include all font features
-            node.setFontFeatures([[feature, value]]);
-          } catch (error) {
-            console.warn(`Failed to set font feature ${feature}:`, error);
-          }
-        }
-      }
-
-      // OpenType features
-      if (style.openTypeFeatures) {
-        for (const [feature, value] of Object.entries(style.openTypeFeatures)) {
-          try {
-            // @ts-ignore: Figma's type definitions might not include all OpenType features
-            node.setOpenTypeFeatures([[feature, value]]);
-          } catch (error) {
-            console.warn(`Failed to set OpenType feature ${feature}:`, error);
-          }
-        }
-      }
-
-      // Text style variants
-      if (style.textStyleId) {
+      // Apply text segments if available
+      if (style.textSegments && Array.isArray(style.textSegments)) {
         try {
-          node.textStyleId = style.textStyleId;
-        } catch (error) {
-          console.warn('Failed to apply text style:', error);
-        }
-      }
-
-      // Hyperlink
-      if (style.hyperlink) {
-        try {
-          node.hyperlink = style.hyperlink;
-        } catch (error) {
-          console.warn('Failed to set hyperlink:', error);
-        }
-      }
-
-      // Mixed styles
-      if (style.textSegments) {
-        try {
-          // Store original text
-          const fullText = node.characters;
-          
           // Clear existing text
           node.characters = '';
           
           // Apply segments
           for (const segment of style.textSegments) {
             const start = node.characters.length;
+            
+            // Load font before applying text
+            if (segment.fontName) {
+              const loadedFont = await this.loadFont({ fontName: segment.fontName });
+              segment.fontName = loadedFont;
+            }
+            
+            // Insert text
             node.insertCharacters(start, segment.characters);
             
             // Apply segment-specific styles
@@ -547,7 +528,6 @@ class TextNodeCreator extends BaseNodeCreator {
               node.setRangeFontSize(start, start + segment.characters.length, segment.fontSize);
             }
             if (segment.fontName) {
-              await figma.loadFontAsync(segment.fontName);
               node.setRangeFontName(start, start + segment.characters.length, segment.fontName);
             }
             if (segment.fills) {
@@ -556,17 +536,14 @@ class TextNodeCreator extends BaseNodeCreator {
             if (segment.textDecoration) {
               node.setRangeTextDecoration(start, start + segment.characters.length, segment.textDecoration);
             }
-            if (segment.textCase) {
-              node.setRangeTextCase(start, start + segment.characters.length, segment.textCase);
-            }
             if (segment.letterSpacing) {
               node.setRangeLetterSpacing(start, start + segment.characters.length, segment.letterSpacing);
             }
             if (segment.lineHeight) {
               node.setRangeLineHeight(start, start + segment.characters.length, segment.lineHeight);
             }
-            if (segment.hyperlink) {
-              node.setRangeHyperlink(start, start + segment.characters.length, segment.hyperlink);
+            if (segment.textCase) {
+              node.setRangeTextCase(start, start + segment.characters.length, segment.textCase);
             }
           }
         } catch (error) {
@@ -574,6 +551,25 @@ class TextNodeCreator extends BaseNodeCreator {
           // Fallback to simple text
           node.characters = data.characters || '';
         }
+      }
+
+      // Apply other text styles
+      if (style.fontSize) node.fontSize = style.fontSize;
+      if (style.textAlignHorizontal) node.textAlignHorizontal = style.textAlignHorizontal;
+      if (style.textAlignVertical) node.textAlignVertical = style.textAlignVertical;
+      if (style.textCase) node.textCase = style.textCase;
+      if (style.textDecoration) node.textDecoration = style.textDecoration;
+      if (style.letterSpacing) node.letterSpacing = style.letterSpacing;
+      if (style.lineHeight) node.lineHeight = style.lineHeight;
+      if (style.paragraphIndent) node.paragraphIndent = style.paragraphIndent;
+      if (style.paragraphSpacing) node.paragraphSpacing = style.paragraphSpacing;
+
+      // Ensure constraints are set for auto-width
+      if (node.textAutoResize === "WIDTH_AND_HEIGHT") {
+        node.constraints = {
+          horizontal: "MIN",
+          vertical: "MIN"
+        };
       }
 
     } catch (error) {
