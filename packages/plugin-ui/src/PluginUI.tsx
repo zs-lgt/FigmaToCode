@@ -46,6 +46,50 @@ export const PluginUI = (props: PluginUIProps) => {
   const [isResponsiveExpanded, setIsResponsiveExpanded] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [showJsonModal, setShowJsonModal] = useState(false);
+  const [enableCodeGen, setEnableCodeGen] = useState(true);
+
+  useEffect(() => {
+    // 从插件获取初始状态
+    window.parent.postMessage({ pluginMessage: { type: 'get-code-gen-state' } }, "*");
+
+    // 监听插件消息
+    const messageHandler = (event: MessageEvent) => {
+      const msg = event.data.pluginMessage;
+      if (msg && msg.type === 'code-gen-state') {
+        setEnableCodeGen(msg.enabled);
+      }
+    };
+    window.addEventListener('message', messageHandler);
+    return () => window.removeEventListener('message', messageHandler);
+  }, []);
+
+  // 更新开关状态时通知插件
+  const handleCodeGenToggle = () => {
+    const newState = !enableCodeGen;
+    setEnableCodeGen(newState);
+    window.parent.postMessage(
+      { 
+        pluginMessage: { 
+          type: 'toggle-code-generation',
+          enabled: newState 
+        } 
+      },
+      "*"
+    );
+  };
+
+  useEffect(() => {
+    // 通知插件当前代码生成状态
+    window.parent.postMessage(
+      { 
+        pluginMessage: { 
+          type: 'toggle-code-generation',
+          enabled: enableCodeGen 
+        } 
+      },
+      "*"
+    );
+  }, [enableCodeGen]);
 
   const handleDeleteNode = () => {
     const selection = window.parent.postMessage(
@@ -114,17 +158,29 @@ export const PluginUI = (props: PluginUIProps) => {
       {/* Node Control Buttons */}
       <div className="flex gap-2 p-2 justify-end">
         <button
+          onClick={handleCodeGenToggle}
+          className={`px-2 py-1 text-sm font-medium rounded-md transition-all duration-200 ${
+            enableCodeGen 
+            ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100" 
+            : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+          }`}
+        >
+          {enableCodeGen ? "关闭代码生成" : "开启代码生成"}
+        </button>
+        
+        <button
           className="px-3 py-1 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm"
           onClick={handleFetchFigmaFile}
         >
           获取Figma文件
         </button>
         <button
-          className="px-3 py-1 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 rounded-md shadow-sm"
           onClick={() => setShowJsonModal(true)}
+          className="px-3 py-1 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 rounded-md shadow-sm"
         >
           导入JSON
         </button>
+
 
         <button
           onClick={handleExportNodesClick}
@@ -207,13 +263,22 @@ export const PluginUI = (props: PluginUIProps) => {
             Copy
           </button>
         </div> */}
-          <CodePanel
-            code={props.code}
-            selectedFramework={props.selectedFramework}
-            preferences={props.preferences}
-            onPreferenceChange={props.onPreferenceChange}
-          />
+          <div className="flex items-center justify-between w-full mb-2">
+            <div className="flex items-center gap-2">
+              <p className="text-lg font-medium text-center dark:text-white rounded-lg">
+                代码生成
+              </p>
+            </div>
+          </div>
 
+          {enableCodeGen && (
+            <CodePanel
+              code={props.code}
+              selectedFramework={props.selectedFramework}
+              preferences={props.preferences}
+              onPreferenceChange={props.onPreferenceChange}
+            />
+          )}
           {props.colors.length > 0 && (
             <ColorsPanel
               colors={props.colors}
@@ -416,6 +481,7 @@ export const CodePanel = (props: {
   const emptySelection = false;
   const [isPressed, setIsPressed] = useState(false);
   const [syntaxHovered, setSyntaxHovered] = useState(false);
+  const [showCodeGen, setShowCodeGen] = useState(true);
 
   const handleButtonClick = () => {
     setIsPressed(true);
@@ -445,102 +511,110 @@ export const CodePanel = (props: {
     return (
       <div className="w-full flex flex-col gap-2 mt-2">
         <div className="flex items-center justify-between w-full">
-          <p className="text-lg font-medium text-center dark:text-white rounded-lg">
-            代码预览
-          </p>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <p className="text-lg font-medium text-center dark:text-white rounded-lg">
+              代码预览
+            </p>
             <button
-              onClick={handleButtonClick}
-              className={`flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                isPressed ? "transform scale-95" : ""
+              onClick={() => setShowCodeGen(!showCodeGen)}
+              className={`px-2 py-1 text-xs font-medium rounded-md transition-all duration-200 ${
+                showCodeGen 
+                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100" 
+                : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
               }`}
             >
-              导出到KAmis
+              {showCodeGen ? "关闭代码生成" : "开启代码生成"}
             </button>
           </div>
-        </div>
-
-        <div className="flex gap-2 justify-center flex-col p-2 dark:bg-black dark:bg-opacity-25 bg-neutral-100 ring-1 ring-neutral-200 dark:ring-neutral-700 rounded-lg text-sm">
-          <div className="flex gap-2 items-center flex-wrap">
-            {/* <span className="min-w-[60px] font-medium">Settings</span> */}
-
-            {preferenceOptions
-              .filter((preference) =>
-                preference.includedLanguages?.includes(props.selectedFramework)
-              )
-              .map((preference) => (
-                <SelectableToggle
-                  key={preference.propertyName}
-                  title={preference.label}
-                  description={preference.description}
-                  isSelected={
-                    props.preferences?.[preference.propertyName] ??
-                    preference.isDefault
-                  }
-                  onSelect={(value) => {
-                    props.onPreferenceChange(preference.propertyName, value);
-                  }}
-                  buttonClass="bg-green-100 dark:bg-black dark:ring-green-800 ring-green-500"
-                  checkClass="bg-green-400 dark:bg-black dark:bg-green-500 dark:border-green-500 ring-green-300 border-green-400"
-                />
-              ))}
-          </div>
-          {selectablePreferencesFiltered.length > 0 && (
-            <>
-              <div className="w-full h-px bg-neutral-200 dark:bg-neutral-700" />
-
-              <div className="flex gap-2 items-center flex-wrap">
-                {selectablePreferencesFiltered.map((preference) => (
-                  <>
-                    {/* <span className="min-w-[60px] font-medium">
-                      {preference.label}
-                    </span> */}
-                    {preference.options.map((option) => (
-                      <SelectableToggle
-                        key={option.label}
-                        title={option.label}
-                        isSelected={
-                          option.value === props.preferences?.[preference.propertyName] || option.isDefault
-                        }
-                        onSelect={() => {
-                          props.onPreferenceChange(
-                            preference.propertyName,
-                            option.value
-                          );
-                        }}
-                        buttonClass="bg-blue-100 dark:bg-black dark:ring-blue-800"
-                        checkClass="bg-blue-400 dark:bg-black dark:bg-blue-500 dark:border-blue-500 ring-blue-300 border-blue-400"
-                      />
-                    ))}
-                  </>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div
-          className={`rounded-lg ring-green-600 transition-all duratio overflow-clip ${
-            syntaxHovered ? "ring-2" : "ring-0"
-          }`}
-        >
-          <SyntaxHighlighter
-            language="dart"
-            style={theme}
-            customStyle={{
-              fontSize: 12,
-              borderRadius: 8,
-              marginTop: 0,
-              marginBottom: 0,
-              backgroundColor: syntaxHovered ? "#1E2B1A" : "#1B1B1B",
-              transitionProperty: "all",
-              transitionTimingFunction: "ease",
-              transitionDuration: "0.2s",
-            }}
+          <button
+            onClick={handleButtonClick}
+            className={`flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+              isPressed ? "transform scale-95" : ""
+            }`}
           >
-            {props.code}
-          </SyntaxHighlighter>
+            导出到KAmis
+          </button>
         </div>
+
+        {showCodeGen && (
+          <>
+            <div className="flex gap-2 justify-center flex-col p-2 dark:bg-black dark:bg-opacity-25 bg-neutral-100 ring-1 ring-neutral-200 dark:ring-neutral-700 rounded-lg text-sm">
+              <div className="flex gap-2 items-center flex-wrap">
+                {preferenceOptions
+                  .filter((preference) =>
+                    preference.includedLanguages?.includes(props.selectedFramework)
+                  )
+                  .map((preference) => (
+                    <SelectableToggle
+                      key={preference.propertyName}
+                      title={preference.label}
+                      description={preference.description}
+                      isSelected={
+                        props.preferences?.[preference.propertyName] ??
+                        preference.isDefault
+                      }
+                      onSelect={(value) => {
+                        props.onPreferenceChange(preference.propertyName, value);
+                      }}
+                      buttonClass="bg-green-100 dark:bg-black dark:ring-green-800 ring-green-500"
+                      checkClass="bg-green-400 dark:bg-black dark:bg-green-500 dark:border-green-500 ring-green-300 border-green-400"
+                    />
+                  ))}
+              </div>
+              {selectablePreferencesFiltered.length > 0 && (
+                <>
+                  <div className="w-full h-px bg-neutral-200 dark:bg-neutral-700" />
+                  <div className="flex gap-2 items-center flex-wrap">
+                    {selectablePreferencesFiltered.map((preference) => (
+                      <>
+                        {preference.options.map((option) => (
+                          <SelectableToggle
+                            key={option.label}
+                            title={option.label}
+                            isSelected={
+                              option.value === props.preferences?.[preference.propertyName] || option.isDefault
+                            }
+                            onSelect={() => {
+                              props.onPreferenceChange(
+                                preference.propertyName,
+                                option.value
+                              );
+                            }}
+                            buttonClass="bg-blue-100 dark:bg-black dark:ring-blue-800"
+                            checkClass="bg-blue-400 dark:bg-black dark:bg-blue-500 dark:border-blue-500 ring-blue-300 border-blue-400"
+                          />
+                        ))}
+                      </>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div
+              className={`rounded-lg ring-green-600 transition-all duratio overflow-clip ${
+                syntaxHovered ? "ring-2" : "ring-0"
+              }`}
+            >
+              <SyntaxHighlighter
+                language="dart"
+                style={theme}
+                customStyle={{
+                  fontSize: 12,
+                  borderRadius: 8,
+                  marginTop: 0,
+                  marginBottom: 0,
+                  backgroundColor: syntaxHovered ? "#1E2B1A" : "#1B1B1B",
+                  transitionProperty: "all",
+                  transitionTimingFunction: "ease",
+                  transitionDuration: "0.2s",
+                }}
+              >
+                {props.code}
+              </SyntaxHighlighter>
+            </div>
+          </>
+        )}
       </div>
     );
   }

@@ -14,6 +14,7 @@ import { htmlCodeGenTextStyles } from "backend/src/html/htmlMain";
 import { swiftUICodeGenTextStyles } from "backend/src/swiftui/swiftuiMain";
 
 let userPluginSettings: PluginSettings;
+let isCodeGenerationEnabled = true;  // 添加代码生成状态控制
 
 const defaultPluginSettings: PluginSettings = {
   framework: "HTML",
@@ -919,11 +920,46 @@ const standardMode = async () => {
     themeColors: true,
   });
   await initSettings();
-  figma.on("selectionchange", () => {
-    safeRun(userPluginSettings);
+
+  // 从本地存储获取代码生成状态
+  const savedCodeGenState = await figma.clientStorage.getAsync('codeGenerationEnabled');
+  if (savedCodeGenState !== undefined) {
+    isCodeGenerationEnabled = savedCodeGenState;
+  }
+
+  // 初始化时发送状态到UI
+  figma.ui.postMessage({
+    type: "code-gen-state",
+    enabled: isCodeGenerationEnabled
   });
+
+  figma.on("selectionchange", () => {
+    if (isCodeGenerationEnabled) {
+      safeRun(userPluginSettings);
+    }
+  });
+
   figma.ui.on('message', (msg) => {
-    if (msg.type === "pluginSettingChanged") {
+    if (msg.type === "get-code-gen-state") {
+      figma.ui.postMessage({
+        type: "code-gen-state",
+        enabled: isCodeGenerationEnabled
+      });
+    } else if (msg.type === "toggle-code-generation") {
+      isCodeGenerationEnabled = msg.enabled;
+      // 保存状态到本地存储
+      figma.clientStorage.setAsync('codeGenerationEnabled', isCodeGenerationEnabled);
+      if (!isCodeGenerationEnabled) {
+        // 清空当前代码
+        figma.ui.postMessage({
+          type: "update-code",
+          code: "",
+        });
+      } else {
+        // 重新生成代码
+        safeRun(userPluginSettings);
+      }
+    } else if (msg.type === "pluginSettingChanged") {
       (userPluginSettings as any)[msg.key] = msg.value;
       figma.clientStorage.setAsync("userPluginSettings", userPluginSettings);
       safeRun(userPluginSettings);
