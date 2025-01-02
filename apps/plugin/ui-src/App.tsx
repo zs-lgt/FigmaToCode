@@ -158,7 +158,7 @@ export default function App() {
                 }
               });
             }
-            
+            const { optimize } = message.data;
             // 生成压缩包
             zip.generateAsync({ type: "blob" })
               .then(function(content) {
@@ -166,7 +166,7 @@ export default function App() {
                 const url = window.URL.createObjectURL(content);
                 const link = document.createElement('a');
                 link.href = url;
-                link.setAttribute('download', 'design-export.zip');
+                link.setAttribute('download', `design-export-${optimize ? 'simplified' : 'complete'}.zip`);
                 document.body.appendChild(link);
                 link.click();
                 

@@ -130,7 +130,17 @@ export const PluginUI = (props: PluginUIProps) => {
   const handleExportNodesClick = () => {
     parent.postMessage({ 
       pluginMessage: { 
-        type: 'export-nodes'
+        type: 'export-nodes',
+        optimize: true
+      }
+    }, '*');
+  };
+
+  const handleExportCompleteNodesClick = () => {
+    parent.postMessage({ 
+      pluginMessage: { 
+        type: 'export-nodes',
+        optimize: false
       }
     }, '*');
   };
@@ -181,13 +191,20 @@ export const PluginUI = (props: PluginUIProps) => {
           导入JSON
         </button>
 
-
-        <button
-          onClick={handleExportNodesClick}
-          className="ml-2 flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-        >
-          导出设计信息
-        </button>
+        <div className="flex space-x-2">
+          <button
+            onClick={handleExportNodesClick}
+            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            导出设计信息（精简版）
+          </button>
+          <button
+            onClick={handleExportCompleteNodesClick}
+            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            导出设计信息（完整版）
+          </button>
+        </div>
       </div>
 
       {/* JSON Import Modal */}
