@@ -113,6 +113,12 @@ class BaseNodeCreator implements NodeCreator {
       height = Math.max(1, Math.abs(data.absoluteBoundingBox.height || 0));
       x = data.absoluteBoundingBox.x || 0;
       y = data.absoluteBoundingBox.y || 0;
+    } else if (data.relativeTransform) {
+      // 使用相对变换矩阵计算位置
+      x = data.relativeTransform[0][2];
+      y = data.relativeTransform[1][2];
+      width = Math.max(1, Math.abs(data.size?.width || data.width || width));
+      height = Math.max(1, Math.abs(data.size?.height || data.height || height));
     } else {
       // Fallback to individual properties
       width = Math.max(1, Math.abs(data.size?.width || data.width || width));
@@ -132,24 +138,21 @@ class BaseNodeCreator implements NodeCreator {
 
     // Convert absolute coordinates to relative if parent bounds are provided
     if (parentBounds) {
-      x = x - parentBounds.x;
-      y = y - parentBounds.y;
+      // 如果是 instance 节点，使用相对变换矩阵中的位置
+      if (data.type === 'INSTANCE' && data.relativeTransform) {
+        x = data.relativeTransform[0][2];
+        y = data.relativeTransform[1][2];
+      } else {
+        x = x - parentBounds.x;
+        y = y - parentBounds.y;
+      }
     }
 
     // Apply position if supported
     if ('x' in node) node.x = x;
     if ('y' in node) node.y = y;
 
-    // Apply rotation if available
-    if ('rotation' in node && data.rotation !== undefined) {
-      node.rotation = data.rotation;
-    }
-
-    // Return the absolute bounds for child positioning
-    return {
-      x: x + (parentBounds?.x || 0),
-      y: y + (parentBounds?.y || 0)
-    };
+    return { x, y };
   }
 
   setAppearance(node: SceneNode, data: any) {
@@ -694,6 +697,38 @@ class InstanceNodeCreator extends BaseNodeCreator {
     // create a frame as a placeholder
     const node = figma.createFrame();
     this.setBaseProperties(node, data);
+
+    // 设置特殊的布局属性
+    if (data.layoutMode) {
+      node.layoutMode = data.layoutMode;
+      if (data.primaryAxisSizingMode) node.primaryAxisSizingMode = data.primaryAxisSizingMode;
+      if (data.counterAxisSizingMode) node.counterAxisSizingMode = data.counterAxisSizingMode;
+      if (data.primaryAxisAlignItems) node.primaryAxisAlignItems = data.primaryAxisAlignItems;
+      if (data.counterAxisAlignItems) node.counterAxisAlignItems = data.counterAxisAlignItems;
+      if (data.paddingLeft) node.paddingLeft = data.paddingLeft;
+      if (data.paddingRight) node.paddingRight = data.paddingRight;
+      if (data.paddingTop) node.paddingTop = data.paddingTop;
+      if (data.paddingBottom) node.paddingBottom = data.paddingBottom;
+      if (data.itemSpacing) node.itemSpacing = data.itemSpacing;
+    }
+
+    // 设置变换属性
+    if (data.relativeTransform) {
+      // 从变换矩阵中提取位置和旋转信息
+      const [a, b, x] = data.relativeTransform[0];
+      const [c, d, y] = data.relativeTransform[1];
+      
+      // 设置位置
+      node.x = x;
+      node.y = y;
+      
+      // 计算并设置旋转角度
+      if (a !== 1 || b !== 0 || c !== 0 || d !== 1) {
+        const rotation = Math.atan2(b, a) * (180 / Math.PI);
+        node.rotation = rotation;
+      }
+    }
+
     this.setAppearance(node, data);
     return node;
   }
@@ -780,8 +815,14 @@ async function importNode(data: any, parent: BaseNode & ChildrenMixin, parentBou
 
     // Process children
     if (data.children && 'appendChild' in node && data.type !== 'TEXT') {
+      // 如果是 instance 节点，使用其自身的位置作为子节点的参考点
+      const childParentBounds = data.type === 'INSTANCE' ? {
+        x: data.relativeTransform ? data.relativeTransform[0][2] : 0,
+        y: data.relativeTransform ? data.relativeTransform[1][2] : 0
+      } : nodeBounds;
+
       for (const childData of data.children) {
-        await importNode(childData, node as BaseNode & ChildrenMixin, nodeBounds);
+        await importNode(childData, node as BaseNode & ChildrenMixin, childParentBounds);
       }
     }
 
