@@ -219,6 +219,7 @@ const addSpacingIfNeeded = (
   const nodeParentLayout =
     optimizeLayout && node.parent && "itemSpacing" in node.parent
       ? node.parent.inferredAutoLayout
+      // @ts-ignore
       : null ?? node.parent;
 
   if (

@@ -41,9 +41,11 @@ const getNodeExportImage = async (nodeId: string) => {
     if (!node) return null;
 
     // 使用节点的导出设置导出图片
+    // @ts-ignore
     const settings = node.exportSettings[0];
     console.log("[getNodeExportImage] settings:", settings);
     
+    // @ts-ignore
     const bytes = await node.exportAsync({
       format: settings.format as "PNG" | "JPG" | "SVG" | "PDF",
       constraint: settings.constraint,
@@ -65,12 +67,14 @@ const imageNodeHandler = async (node: SceneNode) => {
     case "RECTANGLE":
     case "ELLIPSE":
       if (node.isAsset) {
+        // @ts-ignore
         node.fills.forEach(async (fill) => {
           if (fill.type === "IMAGE") {
             const imageHash = fill.imageHash;
             const imgFile = figma.getImageByHash(imageHash);
             try {
               // 获取图片的二进制数据
+              // @ts-ignore
               const imageBytes = await imgFile.getBytesAsync();
               // 将图片二进制文件转成base64 格式
               const base64Image = `data:image/png;base64,${figma.base64Encode(imageBytes)}`;
@@ -105,8 +109,8 @@ const imageNodeHandler = async (node: SceneNode) => {
       break;
     case "INSTANCE":
     case "VECTOR":
-      
       const imageData = await getNodeExportImage(node.id);
+      // @ts-ignore
       const classesString = getClass(node);
       const imageUrl = await uploadImageToUI(imageData, node.id, classesString);
       break;
@@ -114,6 +118,7 @@ const imageNodeHandler = async (node: SceneNode) => {
     case "GROUP":
       if (node?.exportSettings?.length > 0) {
         const imageData = await getNodeExportImage(node.id);
+        // @ts-ignore
         const classesString = getClass(node);
         const imageUrl = await uploadImageToUI(imageData, node.id, classesString);
         

@@ -48,7 +48,9 @@ export const cleanExportData = (obj: any): any => {
       // 只保留必要的样式属性
       const cleanStyle = {};
       for (const styleKey of ESSENTIAL_PROPERTIES.style) {
+        // @ts-ignore
         if (value[styleKey] !== undefined) {
+          // @ts-ignore
           cleanStyle[styleKey] = value[styleKey];
         }
       }
@@ -189,7 +191,7 @@ export const extractCommentDescription = (node: any): string => {
   }
   // 提取所有子节点的 name 并拼接
   return node.children
-    .map(child => child.name);
+    .map((child: SceneNode) => child.name);
 }
 
 /**
@@ -204,9 +206,11 @@ export const getNodeExportImage = async (nodeId: string) => {
     if (!node) return null;
 
     // 使用节点的导出设置导出图片
+    // @ts-ignore
     const settings = node.exportSettings[0];
     console.log("[getNodeExportImage] settings:", settings);
     
+    // @ts-ignore
     const bytes = await node.exportAsync({
       format: settings.format as "PNG" | "JPG" | "SVG" | "PDF",
       constraint: settings.constraint,

@@ -140,6 +140,7 @@ export const convertIntoNodes = (
         // also, Group will always have at least 2 children.
         return convertNodesOnRectangle(clone);
       case "TEXT":
+        // @ts-ignore
         globalTextStyleSegments[node.id] = node.getStyledTextSegments([
           "fontName",
           "fills",
