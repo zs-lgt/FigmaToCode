@@ -42,8 +42,9 @@ export default function App() {
   useEffect(() => {
     window.onmessage = async (event: MessageEvent) => {
       const message = event.data.pluginMessage;
+      console.log("Received message:", message);
       switch (message.type) {
-        case "figma-file-data":
+        case "figma-file-data": {
           setState(prevState => ({
             ...prevState,
             figmaFileData: message.data,
@@ -51,6 +52,7 @@ export default function App() {
           // 处理获取到的Figma文件数据
           console.log("Figma file data:", message.data);
           break;
+        }
         case "upload-image":
           try {
             // 从 base64 字符串中提取实际的 base64 数据
@@ -105,23 +107,6 @@ export default function App() {
             });
           } catch (error) {
             console.error('上传失败:', error);
-          }
-          break;
-        case "export-ux":
-          console.log("Exported UX:", message.data);
-          try {
-            // 下载描述信息文件
-            const descriptionBlob = new Blob([JSON.stringify({ description: message.data.description }, null, 2)], { type: 'application/json' });
-            const descriptionUrl = window.URL.createObjectURL(descriptionBlob);
-            const descriptionLink = document.createElement('a');
-            descriptionLink.href = descriptionUrl;
-            descriptionLink.setAttribute('download', 'description.json');
-            document.body.appendChild(descriptionLink);
-            descriptionLink.click();
-            document.body.removeChild(descriptionLink);
-            window.URL.revokeObjectURL(descriptionUrl);
-          } catch (error) {
-            console.error('下载文件失败:', error);
           }
           break;
         case "export-nodes-result":

@@ -894,7 +894,7 @@ export const Preview: React.FC<{
   return (
     <div className="flex flex-col w-full">
       <div className="py-1.5 flex gap-2 w-full text-lg font-medium text-center dark:text-white rounded-lg justify-between">
-        <span>预览</span>
+        <span>代码预览</span>
         <button
           className={`px-2 py-1 text-sm font-semibold border border-green-500 rounded-md shadow-sm hover:bg-green-500 dark:hover:bg-green-600 hover:text-white hover:border-transparent transition-all duration-300 ${"bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 border-neutral-300 dark:border-neutral-600"}`}
           onClick={() => {
