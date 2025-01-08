@@ -1,6 +1,6 @@
 {
   "name": "@thsf2e/figma-create-backend",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.0", 
   "description": "Backend library for Figma to Code conversion",
   "private": false,
   "license": "MIT",
@@ -9,7 +9,7 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
+    "dist/**",
     "README.md"
   ],
   "scripts": {
