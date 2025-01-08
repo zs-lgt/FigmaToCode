@@ -1,6 +1,6 @@
 {
   "name": "@thsf2e/figma-create-backend",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.1",
   "description": "Backend library for Figma to Code conversion",
   "private": false,
   "main": "./dist/index.js",
