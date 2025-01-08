@@ -3,7 +3,6 @@
   "version": "0.1.0-alpha.0",
   "description": "Backend library for Figma to Code conversion",
   "private": false,
-  "license": "MIT",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
