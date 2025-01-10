@@ -127,6 +127,7 @@ export default function App() {
             // 添加图片文件
             if (message.data.images && message.data.images.length > 0) {
               message.data.images.forEach((imageData) => {
+                console.log("imageData:", imageData);
                 try {
                   // 从 base64 字符串中提取实际的 base64 数据
                   const base64Data = imageData.data.split(',')[1];
