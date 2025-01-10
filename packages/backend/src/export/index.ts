@@ -8,20 +8,20 @@ import {
 
 export { getNodeExportImage };
 
-export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean) => {
+export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean, filterSymbols: boolean = true) => {
   // 获取节点信息
   const nodesInfo = nodes.map(node => getNodeInfo(node));
   let description = '';
-  
+  let filteredNodes = nodesInfo;
   // 仅保留#开头的节点并提取描述信息
-  const filteredNodes = nodesInfo
+  filterSymbols &&  (filteredNodes = nodesInfo
     .map(node => {
       if (node.name === '#comments') {
         description = extractCommentDescription(node);
       }
       return filterHashNodes(node);
     })
-    .filter(node => node !== null && node.name !== '#comments');
+    .filter(node => node !== null && node.name !== '#comments'))
 
   // 导出节点信息和图片
   const exportedNodes = [];
