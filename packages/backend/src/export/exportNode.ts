@@ -1,4 +1,3 @@
-
 // 需要保留的关键属性列表
 export const ESSENTIAL_PROPERTIES = {
   common: ['id', 'name', 'type', 'children'],
@@ -87,6 +86,7 @@ export const getNodeInfo = (node: SceneNode) => {
   if ('isMask' in node) nodeInfo.isMask = node.isMask;
   if ('effects' in node) nodeInfo.effects = node.effects;
   if ('effectStyleId' in node) nodeInfo.effectStyleId = node.effectStyleId;
+  if ('exportSettings' in node) nodeInfo.exportSettings = node.exportSettings;
 
   // 布局属性
   if ('x' in node) nodeInfo.x = node.x;
@@ -98,9 +98,20 @@ export const getNodeInfo = (node: SceneNode) => {
   if ('constrainProportions' in node) nodeInfo.constrainProportions = node.constrainProportions;
   if ('layoutGrow' in node) nodeInfo.layoutGrow = node.layoutGrow;
   if ('layoutPositioning' in node) nodeInfo.layoutPositioning = node.layoutPositioning;
+  if ('layoutSizingHorizontal' in node) nodeInfo.layoutSizingHorizontal = node.layoutSizingHorizontal;
+  if ('layoutSizingVertical' in node) nodeInfo.layoutSizingVertical = node.layoutSizingVertical;
+  if ('maxWidth' in node) nodeInfo.maxWidth = node.maxWidth;
+  if ('maxHeight' in node) nodeInfo.maxHeight = node.maxHeight;
+  if ('minWidth' in node) nodeInfo.minWidth = node.minWidth;
+  if ('minHeight' in node) nodeInfo.minHeight = node.minHeight;
 
   // 约束属性
   if ('constraints' in node) nodeInfo.constraints = node.constraints;
+
+  // 变换属性
+  if ('absoluteBoundingBox' in node) nodeInfo.absoluteBoundingBox = node.absoluteBoundingBox;
+  if ('absoluteRenderBounds' in node) nodeInfo.absoluteRenderBounds = node.absoluteRenderBounds;
+  if ('absoluteTransform' in node) nodeInfo.absoluteTransform = node.absoluteTransform;
 
   // 处理特定类型的节点属性
   if (node.type === 'FRAME' || node.type === 'GROUP' || node.type === 'INSTANCE') {
@@ -119,6 +130,10 @@ export const getNodeInfo = (node: SceneNode) => {
     nodeInfo.paddingBottom = frameNode.paddingBottom;
     nodeInfo.itemSpacing = frameNode.itemSpacing;
     nodeInfo.numberOfFixedChildren = frameNode.numberOfFixedChildren;
+    nodeInfo.clipsContent = frameNode.clipsContent;
+    nodeInfo.guides = frameNode.guides;
+    nodeInfo.layoutGrids = frameNode.layoutGrids;
+    nodeInfo.backgrounds = frameNode.backgrounds;
   }
 
   // 样式属性
@@ -128,9 +143,13 @@ export const getNodeInfo = (node: SceneNode) => {
   if ('strokeAlign' in node) nodeInfo.strokeAlign = node.strokeAlign;
   if ('strokeCap' in node) nodeInfo.strokeCap = node.strokeCap;
   if ('strokeJoin' in node) nodeInfo.strokeJoin = node.strokeJoin;
+  if ('strokeMiterLimit' in node) nodeInfo.strokeMiterLimit = node.strokeMiterLimit;
+  if ('strokesIncludedInLayout' in node) nodeInfo.strokesIncludedInLayout = node.strokesIncludedInLayout;
   if ('dashPattern' in node) nodeInfo.dashPattern = node.dashPattern;
   if ('fillStyleId' in node) nodeInfo.fillStyleId = node.fillStyleId;
   if ('strokeStyleId' in node) nodeInfo.strokeStyleId = node.strokeStyleId;
+  if ('fillGeometry' in node) nodeInfo.fillGeometry = node.fillGeometry;
+  if ('strokeGeometry' in node) nodeInfo.strokeGeometry = node.strokeGeometry;
 
   // 圆角属性
   if ('cornerRadius' in node) nodeInfo.cornerRadius = node.cornerRadius;

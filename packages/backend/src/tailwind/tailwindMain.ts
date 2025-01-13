@@ -364,13 +364,18 @@ export const tailwindContainer = (
         );
       }
     }
+    // 如果node.name是以$开头，则添加name属性
+    if (node.name.startsWith("$")) {
+      // 将name属性直接添加到build字符串中，而不是通过addAttributes
+      src += ` name="${node.name}"`;
+    }
 
     if (children) {
-      return `\n<${tag}${build}${src}>${indentString(children)}\n</${tag}>`;
+      return `\n<${tag}${builder.build()}${src}>${indentString(children)}\n</${tag}>`;
     } else if (selfClosingTags.includes(tag) || isJsx) {
-      return `\n<${tag} id="${node.id}"${build}${src} />`;
+      return `\n<${tag} id="${node.id}"${builder.build()}${src} />`;
     } else {
-      return `\n<${tag}${build}${src}></${tag}>`;
+      return `\n<${tag}${builder.build()}${src}></${tag}>`;
     }
   }
 
