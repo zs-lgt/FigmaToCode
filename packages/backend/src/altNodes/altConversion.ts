@@ -312,3 +312,15 @@ export const getBoundingRect = (
 
   return boundingRect;
 };
+
+/**
+ * 格式化矢量路径数据，确保命令和数字之间有正确的空格，并处理负数情况
+ */
+export const formatVectorPathData = (data: string): string => {
+  return data
+    .replace(/([A-Za-z])(-?\d)/g, '$1 $2')  // 处理命令后的数字(包括负数)
+    .replace(/(\d)([A-Za-z])/g, '$1 $2')    // 处理数字后的命令
+    .replace(/(\d)-(\d)/g, '$1 -$2')        // 处理数字之间的负号
+    .replace(/\s+/g, ' ')                   // 规范化空格
+    .trim();
+};

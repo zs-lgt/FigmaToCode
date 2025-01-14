@@ -25,24 +25,20 @@ export class BaseNodeCreator implements NodeCreator {
     let x = 0;
     let y = 0;
 
-    // Get absolute bounds
-    if (data.absoluteBoundingBox) {
-      width = Math.max(1, Math.abs(data.absoluteBoundingBox.width || 0));
-      height = Math.max(1, Math.abs(data.absoluteBoundingBox.height || 0));
+    // Get size from data
+    width = Math.max(1, Math.abs(data.width || data.size?.width || width));
+    height = Math.max(1, Math.abs(data.height || data.size?.height || height));
+
+    // For INSTANCE nodes and their children, always use their own x,y coordinates
+    if (data.type === 'INSTANCE' || (parentBounds && data.id?.includes(';'))) {
+      x = data.x ?? 0;
+      y = data.y ?? 0;
+    } else if (data.absoluteBoundingBox) {
       x = data.absoluteBoundingBox.x || 0;
       y = data.absoluteBoundingBox.y || 0;
     } else if (data.relativeTransform) {
-      // 使用相对变换矩阵计算位置
       x = data.relativeTransform[0][2];
       y = data.relativeTransform[1][2];
-      width = Math.max(1, Math.abs(data.size?.width || data.width || width));
-      height = Math.max(1, Math.abs(data.size?.height || data.height || height));
-    } else {
-      // Fallback to individual properties
-      width = Math.max(1, Math.abs(data.size?.width || data.width || width));
-      height = Math.max(1, Math.abs(data.size?.height || data.height || height));
-      x = data.x || 0;
-      y = data.y || 0;
     }
 
     // Apply size if supported
@@ -54,23 +50,33 @@ export class BaseNodeCreator implements NodeCreator {
       }
     }
 
-    // Convert absolute coordinates to relative if parent bounds are provided
+    // For INSTANCE nodes and their children, always use their own x,y as relative position
+    let relativeX = x;
+    let relativeY = y;
+    
     if (parentBounds) {
-      // 如果是 instance 节点，使用相对变换矩阵中的位置
-      if (data.type === 'INSTANCE' && data.relativeTransform) {
-        x = data.relativeTransform[0][2];
-        y = data.relativeTransform[1][2];
+      if (data.type === 'INSTANCE' || data.id?.includes(';')) {
+        // For INSTANCE nodes and their children, always use their own x,y properties directly
+        relativeX = data.x ?? 0;
+        relativeY = data.y ?? 0;
       } else {
-        x = x - parentBounds.x;
-        y = y - parentBounds.y;
+        // For other nodes, calculate relative position from absolute coordinates
+        relativeX = x - parentBounds.x;
+        relativeY = y - parentBounds.y;
       }
     }
 
     // Apply position if supported
-    if ('x' in node) node.x = x;
-    if ('y' in node) node.y = y;
+    if ('x' in node) node.x = relativeX;
+    if ('y' in node) node.y = relativeY;
 
-    return { x, y };
+    // Apply rotation if available
+    if ('rotation' in node && data.rotation !== undefined) {
+      node.rotation = data.rotation;
+    }
+
+    // For child positioning, return the actual coordinates used
+    return { x: relativeX + (parentBounds?.x ?? 0), y: relativeY + (parentBounds?.y ?? 0) };
   }
 
   setAppearance(node: SceneNode, data: any) {
