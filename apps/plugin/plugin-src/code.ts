@@ -235,6 +235,33 @@ const standardMode = async () => {
           }
         });
       });
+    } else if (msg.type === 'export-selected-nodes') {
+      const nodes = figma.currentPage.selection;
+      exportNodes(nodes, msg.optimize, false).then(nodesData => {
+        const { nodesInfo, description, images, optimize } = nodesData;
+        const imagesData = [];
+        for (const imageId of images) {
+          const imageBase64 = getNodeExportImage(imageId.id);
+          if (imageBase64) {
+            if (imageBase64) {
+              imagesData.push({
+                name: imageId.name,
+                data: imageBase64
+              });
+            }
+          }
+        }
+        // 发送所有数据
+        figma.ui.postMessage({
+          type: "export-nodes-result",
+          data: {
+            nodesInfo: JSON.stringify(nodesInfo, null, 2),
+            description,
+            images: imagesData,
+            optimize,
+          }
+        });
+      });
     }
     if (msg.type === 'resize') {
       figma.ui.resize(msg.width, msg.height);

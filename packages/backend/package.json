@@ -1,5 +1,5 @@
 {
-  "name": "@thsf2e/figma-create-backend",
+  "name": "backend",
   "version": "0.1.0-alpha.1",
   "description": "Backend library for Figma to Code conversion",
   "private": false,

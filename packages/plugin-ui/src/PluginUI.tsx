@@ -145,6 +145,15 @@ export const PluginUI = (props: PluginUIProps) => {
     }, '*');
   };
 
+  const handleExportSelectedNodesClick = () => {
+    parent.postMessage({ 
+      pluginMessage: { 
+        type: 'export-selected-nodes',
+        optimize: true,
+      }
+    }, '*');
+  };
+
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
@@ -178,12 +187,12 @@ export const PluginUI = (props: PluginUIProps) => {
           {enableCodeGen ? "关闭代码生成" : "开启代码生成"}
         </button>
         
-        <button
+        {/* <button
           className="px-3 py-1 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm"
           onClick={handleFetchFigmaFile}
         >
           获取Figma文件
-        </button>
+        </button> */}
         <button
           onClick={() => setShowJsonModal(true)}
           className="px-3 py-1 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 rounded-md shadow-sm"
@@ -192,6 +201,12 @@ export const PluginUI = (props: PluginUIProps) => {
         </button>
 
         <div className="flex space-x-2">
+          <button
+            onClick={handleExportSelectedNodesClick}
+            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            导出选中
+          </button>
           <button
             onClick={handleExportNodesClick}
             className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
