@@ -1,12 +1,13 @@
 import { retrieveTopFill } from "../common/retrieveFill";
 import { indentString } from "../common/indentString";
-import { tailwindVector } from "./vector";
 import { TailwindTextBuilder } from "./tailwindTextBuilder";
 import { TailwindDefaultBuilder } from "./tailwindDefaultBuilder";
-import { PluginSettings } from "../code";
 import { tailwindAutoLayoutProps } from "./builderImpl/tailwindAutoLayout";
 import { commonSortChildrenWhenInferredAutoLayout } from "../common/commonChildrenOrder";
-import { getClass, type NodeInfo } from './getClass';
+import { AltNode, PluginSettings, TailwindSettings } from "types";
+import { addWarning } from "../common/commonConversionWarnings";
+import { renderAndAttachSVG } from "../altNodes/altNodeUtils";
+import { getVisibleNodes } from "../common/nodeVisibility";
 
 export let localTailwindSettings: PluginSettings;
 
@@ -14,17 +15,14 @@ let previousExecutionCache: { style: string; text: string }[];
 
 const selfClosingTags = ["img"];
 
-// 在文件顶部添加一个 Promise 来处理异步的图片上传
-let imageUploadPromise: Promise<string>;
-
-export const tailwindMain = (
+export const tailwindMain = async (
   sceneNode: Array<SceneNode>,
-  settings: PluginSettings
-): string => {
+  settings: PluginSettings,
+) => {
   localTailwindSettings = settings;
   previousExecutionCache = [];
 
-  let result = tailwindWidgetGenerator(sceneNode, localTailwindSettings.jsx);
+  let result = await tailwindWidgetGenerator(sceneNode, settings);
 
   // remove the initial \n that is made in Container.
   if (result.length > 0 && result.startsWith("\n")) {
@@ -34,232 +32,94 @@ export const tailwindMain = (
   return result;
 };
 
-const getNodeExportImage = async (nodeId: string) => {
-  try {
-    // 获取节点
-    const node = figma.getNodeById(nodeId);
-    if (!node) return null;
-
-    // 使用节点的导出设置导出图片
-    // @ts-ignore
-    const settings = node.exportSettings[0];
-    console.log("[getNodeExportImage] settings:", settings);
-    
-    // @ts-ignore
-    const bytes = await node.exportAsync({
-      format: settings.format as "PNG" | "JPG" | "SVG" | "PDF",
-      constraint: settings.constraint,
-      contentsOnly: settings.contentsOnly
-    });
-
-    // 转换为 base64
-    const base64String = figma.base64Encode(bytes);
-    return `data:image/${settings.format.toLowerCase()};base64,${base64String}`;
-
-  } catch (error) {
-    console.error('Error exporting node:', error);
-    return null;
-  }
+// TODO: lint idea: replace BorderRadius.only(topleft: 8, topRight: 8) with BorderRadius.horizontal(8)
+const tailwindWidgetGenerator = async (
+  sceneNode: ReadonlyArray<SceneNode>,
+  settings: TailwindSettings,
+): Promise<string> => {
+  // filter non visible nodes. This is necessary at this step because conversion already happened.
+  const promiseOfConvertedCode = getVisibleNodes(sceneNode).map(
+    convertNode(settings),
+  );
+  const code = (await Promise.all(promiseOfConvertedCode)).join("");
+  return code;
 };
-// 图片节点处理
-const imageNodeHandler = async (node: SceneNode) => {
+
+const convertNode = (settings: TailwindSettings) => async (node: SceneNode) => {
+  const altNode = await renderAndAttachSVG(node);
+  if (altNode.svg) return tailwindWrapSVG(altNode, settings);
+
   switch (node.type) {
     case "RECTANGLE":
     case "ELLIPSE":
-      if (node.isAsset) {
-        // @ts-ignore
-        node.fills.forEach(async (fill) => {
-          if (fill.type === "IMAGE") {
-            const imageHash = fill.imageHash;
-            const imgFile = figma.getImageByHash(imageHash);
-            try {
-              // 获取图片的二进制数据
-              // @ts-ignore
-              const imageBytes = await imgFile.getBytesAsync();
-              // 将图片二进制文件转成base64 格式
-              const base64Image = `data:image/png;base64,${figma.base64Encode(imageBytes)}`;
-              // 发送消息到 UI 层处理网络请求
-              // 创建一个新的 Promise 来等待上传结果
-              imageUploadPromise = new Promise((resolve) => {
-                // 监听来自 UI 的消息
-                figma.ui.onmessage = (msg) => {
-                  if (msg.type === 'upload-image-complete') {
-                    resolve(msg.imageUrl);
-                  }
-                };
-                
-                // 发送消息到 UI
-                figma.ui.postMessage({
-                  type: 'upload-image',
-                  base64Image: base64Image,
-                  nodeId: node.id,
-                });
-              });
-              
-              // 等待上传完成并获取URL
-              const imageUrl = await imageUploadPromise;
-              // 使用返回的图片URL更新组件
-              // builder.addAttributes(`bg-[url(${imageUrl})]`);
-            } catch (error) {
-              console.error('图片处理失败:', error);
-            }
-          }
-        });
-      }
-      break;
-    case "INSTANCE":
-    case "VECTOR":
-      const imageData = await getNodeExportImage(node.id);
-      // @ts-ignore
-      const classesString = getClass(node);
-      const imageUrl = await uploadImageToUI(imageData, node.id, classesString);
-      break;
-    case "FRAME":
+      return tailwindContainer(node, "", "", settings);
     case "GROUP":
-      if (node?.exportSettings?.length > 0) {
-        const imageData = await getNodeExportImage(node.id);
-        // @ts-ignore
-        const classesString = getClass(node);
-        const imageUrl = await uploadImageToUI(imageData, node.id, classesString);
-        
-      }
+      return tailwindGroup(node, settings);
+    case "FRAME":
+    case "COMPONENT":
+    case "INSTANCE":
+    case "COMPONENT_SET":
+      return tailwindFrame(node, settings);
+    case "TEXT":
+      return tailwindText(node, settings);
+    case "LINE":
+      return tailwindLine(node, settings);
+    case "SECTION":
+      return tailwindSection(node, settings);
+    case "VECTOR":
+      addWarning("VectorNodes are not supported in Tailwind");
       break;
     default:
-      break;
+      addWarning(`${node.type} nodes are not supported in Tailwind`);
   }
-  
-}
-
-// 添加新的图片上传函数
-const uploadImageToUI = async (imageData: string | null, nodeId: string, classesString?: string): Promise<string> => {
-  if (!imageData) return '';
-  
-  return new Promise((resolve) => {
-    figma.ui.onmessage = (msg) => {
-      if (msg.type === 'upload-image-complete') {
-        resolve(msg.imageUrl);
-      }
-    };
-
-    figma.ui.postMessage({
-      type: 'upload-image',
-      base64Image: imageData,
-      nodeId: nodeId,
-      classesString: classesString,
-    });
-  });
+  return "";
 };
 
-// todo：代码检查想法：将 BorderRadius.only(topleft: 8, topRight: 8) 替换为 BorderRadius.horizontal(8)
-const tailwindWidgetGenerator = (
-  sceneNode: ReadonlyArray<SceneNode>,
-  isJsx: boolean
+const tailwindWrapSVG = (
+  node: AltNode<SceneNode>,
+  settings: TailwindSettings,
 ): string => {
-  let comp = "";
+  if (node.svg === "") return "";
+  const builder = new TailwindDefaultBuilder(node, settings)
+    .addData("svg-wrapper")
+    .position();
 
-  // 过滤不可见节点。这一步是必要的，因为转换已经发生。
-  const visibleSceneNode = sceneNode.filter((d) => d.visible);
-  visibleSceneNode.forEach((node) => {
-    // 图片节点处理
-    imageNodeHandler(node);
-    switch (node.type) {
-      case "RECTANGLE":
-      case "ELLIPSE":
-        comp += tailwindContainer(node, "", "", isJsx);
-        break;
-      case "GROUP":
-        comp += tailwindGroup(node, isJsx);
-        break;
-      case "FRAME":
-      case "COMPONENT":
-      case "INSTANCE":
-      case "COMPONENT_SET":
-        comp += tailwindFrame(node, isJsx);
-        break;
-      case "TEXT":
-        comp += tailwindText(node, isJsx);
-        break;
-      case "LINE":
-        comp += tailwindLine(node, isJsx);
-        break;
-      case "SECTION":
-        comp += tailwindSection(node, isJsx);
-        break;
-      case "VECTOR":
-        // 如果node的id是I开头的，则跳过
-        if (node.id.startsWith("I")) {
-          break;
-        }
-        comp += tailwindContainer(node, "", "", isJsx);
-        break;
-    }
-  });
-
-  return comp;
+  return `\n<div${builder.build()}>\n${node.svg ?? ""}</div>`;
 };
 
-const tailwindGroup = (node: GroupNode, isJsx: boolean = false): string => {
-  // 当尺寸为零或更小时忽略视图
-  // 虽然技术上不应该小于0，但由于舍入误差，
-  // 它可能会得到类似：-0.000004196293048153166 的值
-  // 同时如果内部没有子元素，这也没有意义，所以也要忽略
+const tailwindGroup = async (node: GroupNode, settings: TailwindSettings) => {
+  // ignore the view when size is zero or less
+  // while technically it shouldn't get less than 0, due to rounding errors,
+  // it can get to values like: -0.000004196293048153166
+  // also ignore if there are no children inside, which makes no sense
   if (node.width < 0 || node.height <= 0 || node.children.length === 0) {
     return "";
   }
 
-  // 如果存在导出设置，只返回容器节点，不处理子节点
-  if (node?.exportSettings?.length > 0) {
-    const builder = new TailwindDefaultBuilder(
-      node,
-      localTailwindSettings.layerName,
-      isJsx
-    )
-      .blend(node)
-      .size(node, localTailwindSettings.optimizeLayout)
-      .position(node, localTailwindSettings.optimizeLayout);
-
-    const attr = builder.build("");
-    return `\n<div id="${node.id}"${attr}></div>`;
-  }
-
-  const vectorIfExists = tailwindVector(
-    node,
-    localTailwindSettings.layerName,
-    "",
-    isJsx
-  );
-  
-  if (vectorIfExists) return vectorIfExists;
   // this needs to be called after CustomNode because widthHeight depends on it
-  const builder = new TailwindDefaultBuilder(
-    node,
-    localTailwindSettings.layerName,
-    isJsx
-  )
-    .blend(node)
-    .size(node, localTailwindSettings.optimizeLayout)
-    .position(node, localTailwindSettings.optimizeLayout);
+  const builder = new TailwindDefaultBuilder(node, settings)
+    .blend()
+    .size()
+    .position();
 
   if (builder.attributes || builder.style) {
     const attr = builder.build("");
 
-    const generator = tailwindWidgetGenerator(node.children, isJsx);
+    const generator = await tailwindWidgetGenerator(node.children, settings);
 
     return `\n<div${attr}>${indentString(generator)}\n</div>`;
   }
 
-  return tailwindWidgetGenerator(node.children, isJsx);
+  return await tailwindWidgetGenerator(node.children, settings);
 };
 
-export const tailwindText = (node: TextNode, isJsx: boolean): string => {
-  let layoutBuilder = new TailwindTextBuilder(
-    node,
-    localTailwindSettings.layerName,
-    isJsx
-  )
-    .commonPositionStyles(node, localTailwindSettings.optimizeLayout)
-    .textAlign(node)
-    .lineClamp(node);
+export const tailwindText = (
+  node: TextNode,
+  settings: TailwindSettings,
+): string => {
+  let layoutBuilder = new TailwindTextBuilder(node, settings)
+    .commonPositionStyles()
+    .textAlign();
 
   const styledHtml = layoutBuilder.getTextSegments(node.id);
   previousExecutionCache.push(...styledHtml);
@@ -268,58 +128,80 @@ export const tailwindText = (node: TextNode, isJsx: boolean): string => {
   if (styledHtml.length === 1) {
     layoutBuilder.addAttributes(styledHtml[0].style);
     content = styledHtml[0].text;
+
+    const additionalTag =
+      styledHtml[0].openTypeFeatures.SUBS === true
+        ? "sub"
+        : styledHtml[0].openTypeFeatures.SUPS === true
+          ? "sup"
+          : "";
+
+    if (additionalTag) {
+      content = `<${additionalTag}>${content}</${additionalTag}>`;
+    }
   } else {
     content = styledHtml
-      .map((style) => `<span class="${style.style}">${style.text}</span>`)
+      .map((style) => {
+        const tag =
+          style.openTypeFeatures.SUBS === true
+            ? "sub"
+            : style.openTypeFeatures.SUPS === true
+              ? "sup"
+              : "span";
+
+        return `<${tag} class="${style.style}">${style.text}</${tag}>`;
+      })
       .join("");
   }
 
   return `\n<div${layoutBuilder.build()}>${content}</div>`;
 };
 
-const tailwindFrame = (
+const tailwindFrame = async (
   node: FrameNode | InstanceNode | ComponentNode | ComponentSetNode,
-  isJsx: boolean
-): string => {
-  // 如果存在导出设置并且非图片，只返回容器节点，不处理子节点
-  if (node?.exportSettings?.length > 0 && node.isAsset) {
-    const builder = new TailwindDefaultBuilder(
-      node,
-      localTailwindSettings.layerName,
-      isJsx
-    )
-      .blend(node)
-      .size(node, localTailwindSettings.optimizeLayout)
-      .position(node, localTailwindSettings.optimizeLayout);
-
-    const attr = builder.build("");
-    return `\n<div id="${node.id}"${attr}></div>`;
-  }
-  const childrenStr = tailwindWidgetGenerator(
+  settings: TailwindSettings,
+): Promise<string> => {
+  const childrenStr = await tailwindWidgetGenerator(
     commonSortChildrenWhenInferredAutoLayout(
       node,
-      localTailwindSettings.optimizeLayout
+      localTailwindSettings.optimizeLayout,
     ),
-    isJsx
+    settings,
   );
+
+  // Add overflow-hidden class if clipsContent is true
+  const clipsContentClass = node.clipsContent ? " overflow-hidden" : "";
 
   if (node.layoutMode !== "NONE") {
     const rowColumn = tailwindAutoLayoutProps(node, node);
-    return tailwindContainer(node, childrenStr, rowColumn, isJsx);
+    return tailwindContainer(
+      node,
+      childrenStr,
+      rowColumn + clipsContentClass,
+      settings,
+    );
   } else {
-    if (localTailwindSettings.optimizeLayout && node.inferredAutoLayout !== null) {
+    if (
+      localTailwindSettings.optimizeLayout &&
+      node.inferredAutoLayout !== null
+    ) {
       const rowColumn = tailwindAutoLayoutProps(node, node.inferredAutoLayout);
-      return tailwindContainer(node, childrenStr, rowColumn, isJsx);
+      return tailwindContainer(
+        node,
+        childrenStr,
+        rowColumn + clipsContentClass,
+        settings,
+      );
     }
 
     // node.layoutMode === "NONE" && node.children.length > 1
     // children needs to be absolute
-    return tailwindContainer(node, childrenStr, "", isJsx);
+    return tailwindContainer(node, childrenStr, clipsContentClass, settings);
   }
 };
 
-// 名称为 propSomething 的属性始终处理 ","
-// 有时属性可能不存在，所以不添加 ","
+// properties named propSomething always take care of ","
+// sometimes a property might not exist, so it doesn't add ","
 export const tailwindContainer = (
   node: SceneNode &
     SceneNodeMixin &
@@ -329,80 +211,72 @@ export const tailwindContainer = (
     MinimalBlendMixin,
   children: string,
   additionalAttr: string,
-  isJsx: boolean
+  settings: TailwindSettings,
 ): string => {
   // ignore the view when size is zero or less
   // while technically it shouldn't get less than 0, due to rounding errors,
   // it can get to values like: -0.000004196293048153166
-  
   if (node.width < 0 || node.height < 0) {
     return children;
   }
 
-  let builder = new TailwindDefaultBuilder(node, localTailwindSettings.layerName, isJsx)
-    .commonPositionStyles(node, localTailwindSettings.optimizeLayout)
-    .commonShapeStyles(node);
+  let builder = new TailwindDefaultBuilder(node, settings)
+    .commonPositionStyles()
+    .commonShapeStyles();
 
   if (builder.attributes || additionalAttr) {
     const build = builder.build(additionalAttr);
 
-    // 如果node是img，则不添加bg-[url()]属性
+    // image fill and no children -- let's emit an <img />
     let tag = "div";
     let src = "";
-    // 如果node的fills是image，则将tag设置为img，并设置src
     if (retrieveTopFill(node.fills)?.type === "IMAGE") {
+      addWarning("Image fills are replaced with placeholders");
       if (!("children" in node) || node.children.length === 0) {
         tag = "img";
         src = ` src="https://via.placeholder.com/${node.width.toFixed(
-          0
+          0,
         )}x${node.height.toFixed(0)}"`;
       } else {
         builder.addAttributes(
           `bg-[url(https://via.placeholder.com/${node.width.toFixed(
-            0
-          )}x${node.height.toFixed(0)})]`
+            0,
+          )}x${node.height.toFixed(0)})]`,
         );
       }
     }
-    // 如果node.name是以$开头，则添加name属性
-    if (node.name.startsWith("$")) {
-      // 将name属性直接添加到build字符串中，而不是通过addAttributes
-      src += ` name="${node.name}"`;
-    }
 
     if (children) {
-      return `\n<${tag}${builder.build()}${src}>${indentString(children)}\n</${tag}>`;
-    } else if (selfClosingTags.includes(tag) || isJsx) {
-      return `\n<${tag} id="${node.id}"${builder.build()}${src} />`;
+      return `\n<${tag}${build}${src}>${indentString(children)}\n</${tag}>`;
+    } else if (selfClosingTags.includes(tag) || settings.jsx) {
+      return `\n<${tag}${build}${src} />`;
     } else {
-      return `\n<${tag}${builder.build()}${src}></${tag}>`;
+      return `\n<${tag}${build}${src}></${tag}>`;
     }
   }
 
   return children;
 };
 
-export const tailwindLine = (node: LineNode, isJsx: boolean): string => {
-  const builder = new TailwindDefaultBuilder(
-    node,
-    localTailwindSettings.layerName,
-    isJsx
-  )
-    .commonPositionStyles(node, localTailwindSettings.optimizeLayout)
-    .commonShapeStyles(node);
+export const tailwindLine = (
+  node: LineNode,
+  settings: TailwindSettings,
+): string => {
+  const builder = new TailwindDefaultBuilder(node, settings)
+    .commonPositionStyles()
+    .commonShapeStyles();
 
   return `\n<div${builder.build()}></div>`;
 };
 
-export const tailwindSection = (node: SectionNode, isJsx: boolean): string => {
-  const childrenStr = tailwindWidgetGenerator(node.children, isJsx);
-  const builder = new TailwindDefaultBuilder(
-    node,
-    localTailwindSettings.layerName,
-    isJsx
-  )
-    .size(node, localTailwindSettings.optimizeLayout)
-    .position(node, localTailwindSettings.optimizeLayout)
+export const tailwindSection = async (
+  node: SectionNode,
+  settings: TailwindSettings,
+): Promise<string> => {
+  const childrenStr = await tailwindWidgetGenerator(node.children, settings);
+  const builder = new TailwindDefaultBuilder(node, settings)
+    .size()
+    .position()
     .customColor(node.fills, "bg");
 
   if (childrenStr) {
@@ -418,7 +292,7 @@ export const tailwindCodeGenTextStyles = () => {
     .join("\n---\n");
 
   if (!result) {
-    return "// 此选择中没有文本式";
+    return "// No text styles in this selection";
   }
 
   return result;

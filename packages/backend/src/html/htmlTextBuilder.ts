@@ -6,13 +6,18 @@ import {
   commonLetterSpacing,
   commonLineHeight,
 } from "../common/commonTextHeightSpacing";
+import { HTMLSettings } from "types";
 
 export class HtmlTextBuilder extends HtmlDefaultBuilder {
-  constructor(node: TextNode, showLayerName: boolean, optIsJSX: boolean) {
-    super(node, showLayerName, optIsJSX);
+  constructor(node: TextNode, settings: HTMLSettings) {
+    super(node, settings);
   }
 
-  getTextSegments(id: string): { style: string; text: string }[] {
+  getTextSegments(id: string): {
+    style: string;
+    text: string;
+    openTypeFeatures: { [key: string]: boolean };
+  }[] {
     const segments = globalTextStyleSegments[id];
     if (!segments) {
       return [];
@@ -31,16 +36,20 @@ export class HtmlTextBuilder extends HtmlDefaultBuilder {
           "line-height": this.lineHeight(segment.lineHeight, segment.fontSize),
           "letter-spacing": this.letterSpacing(
             segment.letterSpacing,
-            segment.fontSize
+            segment.fontSize,
           ),
           // "text-indent": segment.indentation,
           "word-wrap": "break-word",
         },
-        this.isJSX
+        this.isJSX,
       );
 
       const charsWithLineBreak = segment.characters.split("\n").join("<br/>");
-      return { style: styleAttributes, text: charsWithLineBreak };
+      return {
+        style: styleAttributes,
+        text: charsWithLineBreak,
+        openTypeFeatures: segment.openTypeFeatures,
+      };
     });
   }
 
@@ -107,7 +116,8 @@ export class HtmlTextBuilder extends HtmlDefaultBuilder {
     return "";
   }
 
-  textAlign(node: TextNode): this {
+  textAlign(): this {
+    const node = this.node as TextNode;
     // if alignHorizontal is LEFT, don't do anything because that is native
 
     // only undefined in testing

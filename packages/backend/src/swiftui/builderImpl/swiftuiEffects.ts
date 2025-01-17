@@ -1,13 +1,13 @@
 import { sliceNum } from "../../common/numToAutoFixed";
-import { Modifier } from "./swiftuiParser";
+import { SwiftUIModifier } from "types";
 
-export const swiftuiShadow = (node: SceneNode): Modifier | null => {
+export const swiftuiShadow = (node: SceneNode): SwiftUIModifier | null => {
   if (!("effects" in node) || node.effects.length === 0) {
     return null;
   }
 
   const dropShadow: Array<DropShadowEffect> = node.effects.filter(
-    (d): d is DropShadowEffect => d.type === "DROP_SHADOW" && d.visible
+    (d): d is DropShadowEffect => d.type === "DROP_SHADOW" && d.visible,
   );
 
   if (dropShadow.length === 0) {
@@ -44,13 +44,13 @@ export const swiftuiShadow = (node: SceneNode): Modifier | null => {
   return ["shadow", comp.join(", ")];
 };
 
-export const swiftuiBlur = (node: SceneNode): Modifier | null => {
+export const swiftuiBlur = (node: SceneNode): SwiftUIModifier | null => {
   if (!("effects" in node) || node.effects.length === 0) {
     return null;
   }
 
   const layerBlur: Array<BlurEffect> = node.effects.filter(
-    (d): d is BlurEffect => d.type === "LAYER_BLUR" && d.visible
+    (d): d is BlurEffect => d.type === "LAYER_BLUR" && d.visible,
   );
 
   if (layerBlur.length === 0) {

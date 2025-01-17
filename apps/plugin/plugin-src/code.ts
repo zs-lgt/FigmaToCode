@@ -22,7 +22,7 @@ const defaultPluginSettings: PluginSettings = {
   framework: "HTML",
   jsx: false,
   optimizeLayout: true,
-  layerName: false,
+  showLayerNames: false,
   inlineStyle: true,
   responsiveRoot: false,
   flutterGenerationMode: "snippet",
@@ -284,13 +284,13 @@ const codegenMode = async () => {
             code: htmlMain(
               convertedSelection,
               { ...userPluginSettings, jsx: false },
-              true
+              true,
             ),
             language: "HTML",
           },
           {
             title: `Text Styles`,
-            code: htmlCodeGenTextStyles(false),
+            code: htmlCodeGenTextStyles(userPluginSettings),
             language: "HTML",
           },
         ];
@@ -301,18 +301,19 @@ const codegenMode = async () => {
             code: htmlMain(
               convertedSelection,
               { ...userPluginSettings, jsx: true },
-              true
+              true,
             ),
             language: "HTML",
           },
           {
             title: `Text Styles`,
-            code: htmlCodeGenTextStyles(true),
+            code: htmlCodeGenTextStyles(userPluginSettings),
             language: "HTML",
           },
         ];
       case "tailwind":
       case "tailwind_jsx":
+        console.log(11111, convertedSelection, userPluginSettings);
         return [
           {
             title: `Code`,

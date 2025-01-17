@@ -76,6 +76,9 @@ export class BaseNodeCreator implements NodeCreator {
   setAppearance(node: SceneNode, data: any) {
     // Set fills
     if ('fills' in node && data.fills) {
+      if (node.type === 'RECTANGLE') {
+        console.log('aaaa', node.name, data);
+      }
       try {
         node.fills = this.processFills(data.fills);
       } catch (error) {

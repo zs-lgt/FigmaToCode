@@ -8,7 +8,7 @@ export const sliceNum = (num: number): string => {
 export const printPropertyIfNotDefault = (
   propertyName: string,
   propertyValue: any,
-  defaultProperty: any
+  defaultProperty: any,
 ): string => {
   if (propertyValue === defaultProperty) {
     return "";
@@ -18,7 +18,7 @@ export const printPropertyIfNotDefault = (
 
 export const skipDefaultProperty = <T>(
   propertyValue: T,
-  defaultProperty: T
+  defaultProperty: T,
 ): T | string => {
   if (propertyValue === defaultProperty) {
     return "";
@@ -28,7 +28,7 @@ export const skipDefaultProperty = <T>(
 
 export const propertyIfNotDefault = (
   propertyValue: any,
-  defaultProperty: any
+  defaultProperty: any,
 ): string => {
   if (propertyValue === defaultProperty) {
     return "";
@@ -36,13 +36,12 @@ export const propertyIfNotDefault = (
   return propertyValue;
 };
 
-type PropertyValueType = number | string | string[];
-
 export const generateWidgetCode = (
   className: string,
-  properties: Record<string, PropertyValueType>,
-  positionedValues?: string[]
+  properties: Record<string, number | string | string[]>,
+  positionedValues?: string[],
 ): string => {
+  console.log("properties", properties);
   const propertiesArray = Object.entries(properties)
     .filter(([, value]) => {
       if (Array.isArray(value)) {
@@ -85,7 +84,7 @@ function escapeRegExp(string: string) {
 export const replaceAllUtil = (str: string, find: string, replace: string) =>
   str.replace(new RegExp(escapeRegExp(find), "g"), replace);
 
-export function className(name: string): string {
+export function stringToClassName(name: string): string {
   const words = name.split(/[^a-zA-Z0-9]+/);
   const camelCaseWords = words.map((word, index) => {
     if (index === 0) {

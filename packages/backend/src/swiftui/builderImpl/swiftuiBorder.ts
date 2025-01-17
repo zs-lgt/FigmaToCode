@@ -2,7 +2,8 @@ import { commonStroke } from "./../../common/commonStroke";
 import { getCommonRadius } from "../../common/commonRadius";
 import { sliceNum } from "../../common/numToAutoFixed";
 import { swiftUISolidColor } from "./swiftuiColor";
-import { Modifier, SwiftUIElement } from "./swiftuiParser";
+import { SwiftUIElement } from "./swiftuiParser";
+import { SwiftUIModifier } from "types";
 
 const swiftUIStroke = (node: SceneNode): number => {
   if (!("strokes" in node) || !node.strokes || node.strokes.length === 0) {
@@ -47,7 +48,7 @@ export const swiftuiBorder = (node: SceneNode): string[] | null => {
     .map((stroke) => {
       const strokeColor = swiftUISolidColor(stroke);
 
-      const strokeModifier: Modifier = [
+      const strokeModifier: SwiftUIModifier = [
         "stroke",
         `${strokeColor}, lineWidth: ${sliceNum(width)}`,
       ];
@@ -79,7 +80,7 @@ const getViewType = (node: SceneNode): string => {
 
 const strokeInset = (
   node: MinimalStrokesMixin,
-  width: number
+  width: number,
 ): [string, string | null] => {
   switch (node.strokeAlign) {
     case "INSIDE":
@@ -114,7 +115,7 @@ export const swiftuiCornerRadius = (node: SceneNode): string => {
     radius.topLeft,
     radius.topRight,
     radius.bottomLeft,
-    radius.bottomRight
+    radius.bottomRight,
   );
 
   if (maxBorder > 0) {

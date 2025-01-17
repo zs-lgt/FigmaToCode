@@ -4,5 +4,5 @@ export { tailwindMain } from "./tailwind/tailwindMain";
 export { swiftuiMain } from "./swiftui/swiftuiMain";
 export { run } from "./code";
 export type { PluginSettings } from "./code";
-export { convertIntoNodes } from "./altNodes/altConversion";
+export { convertNodesToAltNodes as convertIntoNodes } from "./altNodes/altConversion";
 export { exportNodes } from './export'

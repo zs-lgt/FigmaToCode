@@ -168,12 +168,12 @@ export default function App() {
         case "code":
           setState((prevState) => ({
             ...prevState,
-            code: message.data,
+            code: message.code,
             htmlPreview: message.htmlPreview,
             colors: message.colors,
             gradients: message.gradients,
-            preferences: message.preferences,
-            selectedFramework: message.preferences.framework,
+            preferences: message.settings,
+            selectedFramework: message.settings.framework,
           }));
           break;
         case "pluginSettingChanged":
