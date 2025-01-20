@@ -255,7 +255,7 @@ export class TailwindDefaultBuilder {
       this.prependAttributes(stringToClassName(this.name));
     }
     if (this.name) {
-      this.addData("layer", this.name);
+      this.addData("name", this.name);
     }
 
     const classLabel = getClassLabel(this.isJSX);

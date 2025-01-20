@@ -1,7 +1,7 @@
 // 需要保留的关键属性列表
 export const ESSENTIAL_PROPERTIES = {
   common: ['id', 'name', 'type', 'children'],
-  layout: ['x', 'y', 'width', 'height', 'layoutMode', 'primaryAxisAlignItems', 'counterAxisAlignItems', 'padding', 'itemSpacing'],
+  layout: ['x', 'y', 'width', 'height', 'layoutMode', 'primaryAxisAlignItems', 'counterAxisAlignItems', 'padding', 'itemSpacing', 'absoluteBoundingBox'],
   text: ['characters', 'fontSize', 'fontName', 'textAlignHorizontal', 'textAutoResize', 'textCase', 'textDecoration', 'letterSpacing', 'lineHeight'],
   style: ['fills', 'strokes', 'effects', 'cornerRadius', 'strokeWeight'],
   constraints: ['constraints'],

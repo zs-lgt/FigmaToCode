@@ -8,6 +8,7 @@ export const htmlColorFromFills = (
   // kind can be text, bg, border...
   // [when testing] fills can be undefined
 
+  // @ts-ignore
   const fill = retrieveTopFill(fills);
   if (fill && fill.type === "SOLID") {
     // if fill isn't visible, it shouldn't be painted.
