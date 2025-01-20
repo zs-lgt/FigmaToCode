@@ -6,6 +6,7 @@ import {
   assignChildren,
   isTypeOrGroupOfTypes,
 } from "./altNodeUtils";
+import { getStyledTextSegments } from './getStyledTextSegments'
 
 export let globalTextStyleSegments: Record<string, StyledTextSegmentSubset[]> =
   {};
@@ -58,6 +59,10 @@ export const convertNodeToAltNode =
       case "TEXT":
         // @ts-ignore
         globalTextStyleSegments[node.id] = extractStyledTextSegments(node);
+        console.log(
+          "globalTextStyleSegments",
+          globalTextStyleSegments[node.id],
+        );
         return cloneNode(node, parent);
 
       // Unsupported Nodes
@@ -126,8 +131,8 @@ const cloneAsRectangleNode = <T extends BaseNode>(
   return clonedNode as unknown as RectangleNode;
 };
 
-const extractStyledTextSegments = (node: TextNode) =>
-  node.getStyledTextSegments([
+const extractStyledTextSegments = (node: TextNode) => {
+  const segments = node.getStyledTextSegments([
     "fontName",
     "fills",
     "fontSize",
@@ -143,3 +148,8 @@ const extractStyledTextSegments = (node: TextNode) =>
     "fillStyleId",
     "openTypeFeatures",
   ]);
+  // @ts-ignore
+  console.log("extractStyledTextSegments", node, segments, getStyledTextSegments(node));
+  return getStyledTextSegments(node);
+}
+
