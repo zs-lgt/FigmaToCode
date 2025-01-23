@@ -137,14 +137,14 @@ export async function importFigmaJSON(jsonData: any): Promise<void> {
 
     // Set container frame size and position
     containerFrame.resize(maxX - minX, maxY - minY);
-    containerFrame.x = minX;
-    containerFrame.y = minY;
+    containerFrame.x = 0;
+    containerFrame.y = 0;
     containerFrame.fills = [];
     
     // Add to current page
     figma.currentPage.appendChild(containerFrame);
     
-    // Initial bounds for the container
+    // Use minX, minY as offset to convert absolute positions to relative
     const containerBounds = { x: minX, y: minY };
     
     // Import all content

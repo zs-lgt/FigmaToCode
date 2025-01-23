@@ -365,6 +365,48 @@ export class VectorNodeCreator extends BaseNodeCreator {
     const node = figma.createVector();
     this.setBaseProperties(node, data);
     this.setAppearance(node, data);
+    
+    // Try to get vector paths from different sources
+    let vectorPaths = data.vectorPaths;
+    
+    // If no vectorPaths, try to create from strokeGeometry or fillGeometry
+    if (!vectorPaths) {
+      const geometries = [];
+      if (data.strokeGeometry) geometries.push(...data.strokeGeometry);
+      if (data.fillGeometry) geometries.push(...data.fillGeometry);
+      
+      if (geometries.length > 0) {
+        vectorPaths = geometries.map((path: any) => ({
+          windingRule: path.windingRule || "NONZERO",
+          // Format path data to ensure proper spacing around negative numbers and commands
+          data: path.data.replace(/([a-zA-Z])(-?\d)/g, '$1 $2').replace(/(\d)-/g, '$1 -')
+        }));
+      }
+    } else {
+      // Format existing vectorPaths data
+      vectorPaths = vectorPaths.map((path: any) => ({
+        windingRule: path.windingRule || "NONZERO",
+        data: path.data.replace(/([a-zA-Z])(-?\d)/g, '$1 $2').replace(/(\d)-/g, '$1 -')
+      }));
+    }
+    
+    // Set vector paths if available
+    if (vectorPaths && vectorPaths.length > 0) {
+      try {
+        node.vectorPaths = vectorPaths;
+      } catch (error) {
+        console.warn('Failed to set vector paths:', error);
+        // Attempt to set paths individually if bulk set fails
+        vectorPaths.forEach((path: any, index: number) => {
+          try {
+            node.vectorPaths = [path];
+          } catch (innerError) {
+            console.warn(`Failed to set vector path at index ${index}:`, innerError);
+          }
+        });
+      }
+    }
+    
     return node;
   }
 }
