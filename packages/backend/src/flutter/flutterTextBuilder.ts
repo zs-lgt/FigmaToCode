@@ -40,7 +40,7 @@ export class FlutterTextBuilder extends FlutterDefaultBuilder {
           ...basicTextStyle,
           style: segments[0].style,
         },
-        [`'${segments[0].text}'`]
+        [`'${segments[0].text}'`],
       );
     } else {
       this.child = generateWidgetCode("Text.rich", basicTextStyle, [
@@ -49,7 +49,7 @@ export class FlutterTextBuilder extends FlutterDefaultBuilder {
             generateWidgetCode("TextSpan", {
               text: `'${segment.text}'`,
               style: segment.style,
-            })
+            }),
           ),
         }),
       ]);
@@ -58,7 +58,11 @@ export class FlutterTextBuilder extends FlutterDefaultBuilder {
     return this;
   }
 
-  getTextSegments(id: string): { style: string; text: string }[] {
+  getTextSegments(id: string): {
+    style: string;
+    text: string;
+    openTypeFeatures: { [key: string]: boolean };
+  }[] {
     const segments = globalTextStyleSegments[id];
     if (!segments) {
       return [];
@@ -74,10 +78,10 @@ export class FlutterTextBuilder extends FlutterDefaultBuilder {
       const lineHeight = this.lineHeight(segment.lineHeight, segment.fontSize);
       const letterSpacing = this.letterSpacing(
         segment.letterSpacing,
-        segment.fontSize
+        segment.fontSize,
       );
 
-      const style = generateWidgetCode("TextStyle", {
+      const styleProperties: { [key: string]: string } = {
         color: color,
         fontSize: fontSize,
         fontStyle: fontStyle,
@@ -85,12 +89,24 @@ export class FlutterTextBuilder extends FlutterDefaultBuilder {
         fontWeight: fontWeight,
         textDecoration: skipDefaultProperty(
           this.getFlutterTextDecoration(segment.textDecoration),
-          "TextDecoration.none"
+          "TextDecoration.none",
         ),
         // textTransform: textTransform,
-        height: lineHeight/fontSize,
+        height: lineHeight,
         letterSpacing: letterSpacing,
-      });
+      };
+
+      if (
+        (segment.openTypeFeatures as unknown as { SUBS: boolean }).SUBS === true
+      ) {
+        styleProperties.fontFeatures = `[FontFeature.enable("subs")]`;
+      } else if (
+        (segment.openTypeFeatures as unknown as { SUPS: boolean }).SUPS === true
+      ) {
+        styleProperties.fontFeatures = `[FontFeature.enable("sups")]`;
+      }
+
+      const style = generateWidgetCode("TextStyle", styleProperties);
 
       let text = segment.characters;
       if (segment.textCase === "LOWER") {
@@ -102,6 +118,7 @@ export class FlutterTextBuilder extends FlutterDefaultBuilder {
       return {
         style: style,
         text: parseTextAsCode(text).replace(/\$/g, "\\$"),
+        openTypeFeatures: segment.openTypeFeatures,
       };
     });
   }
@@ -151,7 +168,7 @@ export class FlutterTextBuilder extends FlutterDefaultBuilder {
 }
 
 export const wrapTextAutoResize = (node: TextNode, child: string): string => {
-  const { width, height, isExpanded } = flutterSize(node);
+  const { width, height, isExpanded } = flutterSize(node, false);
   let result = "";
 
   switch (node.textAutoResize) {

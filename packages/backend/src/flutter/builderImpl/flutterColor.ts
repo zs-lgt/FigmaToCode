@@ -1,4 +1,5 @@
 import { rgbTo8hex, gradientAngle } from "../../common/color";
+import { addWarning } from "../../common/commonConversionWarnings";
 import { generateWidgetCode, sliceNum } from "../../common/numToAutoFixed";
 import { retrieveTopFill } from "../../common/retrieveFill";
 import { nearestValue } from "../../tailwind/conversionTables";
@@ -7,7 +8,7 @@ import { nearestValue } from "../../tailwind/conversionTables";
  * Retrieve the SOLID color for Flutter when existent, otherwise ""
  */
 export const flutterColorFromFills = (
-  fills: ReadonlyArray<Paint> | PluginAPI["mixed"]
+  fills: ReadonlyArray<Paint> | PluginAPI["mixed"],
 ): string => {
   const fill = retrieveTopFill(fills);
 
@@ -29,7 +30,7 @@ export const flutterColorFromFills = (
 
 export const flutterBoxDecorationColor = (
   node: SceneNode,
-  fills: ReadonlyArray<Paint> | PluginAPI["mixed"]
+  fills: ReadonlyArray<Paint> | PluginAPI["mixed"],
 ): Record<string, string> => {
   const fill = retrieveTopFill(fills);
 
@@ -50,9 +51,10 @@ export const flutterBoxDecorationColor = (
 };
 
 export const flutterDecorationImage = (node: SceneNode, fill: ImagePaint) => {
+  addWarning("Image fills are replaced with placeholders");
   return generateWidgetCode("DecorationImage", {
     image: `NetworkImage("https://via.placeholder.com/${node.width.toFixed(
-      0
+      0,
     )}x${node.height.toFixed(0)}")`,
     fit: fitToBoxFit(fill),
   });
@@ -82,7 +84,7 @@ export const flutterGradient = (fill: GradientPaint): string => {
     case "GRADIENT_ANGULAR":
       return flutterAngularGradient(fill);
     default:
-      // Diamond gradient is unsupported.
+      addWarning("Diamond dradients are not supported in Flutter");
       return "";
   }
 };

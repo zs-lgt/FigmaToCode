@@ -277,7 +277,6 @@ export class FrameNodeCreator extends BaseNodeCreator {
 export class RectangleNodeCreator extends BaseNodeCreator {
   async createNode(data: any): Promise<SceneNode | null> {
     const node = figma.createRectangle();
-    
     this.setBaseProperties(node, data);
     
     // Set corner radius
@@ -286,7 +285,7 @@ export class RectangleNodeCreator extends BaseNodeCreator {
     }
     
     this.setAppearance(node, data);
-    
+    console.log(node.name, node);
     return node;
   }
 }

@@ -1,14 +1,19 @@
-import { className, generateWidgetCode } from "../common/numToAutoFixed";
+import {
+  stringToClassName,
+  generateWidgetCode,
+} from "../common/numToAutoFixed";
 import { retrieveTopFill } from "../common/retrieveFill";
 import { FlutterDefaultBuilder } from "./flutterDefaultBuilder";
 import { FlutterTextBuilder } from "./flutterTextBuilder";
 import { indentString } from "../common/indentString";
-import { PluginSettings } from "../code";
+
 import {
   getCrossAxisAlignment,
   getMainAxisAlignment,
 } from "./builderImpl/flutterAutoLayout";
 import { commonSortChildrenWhenInferredAutoLayout } from "../common/commonChildrenOrder";
+import { PluginSettings } from "types";
+import { addWarning } from "../common/commonConversionWarnings";
 
 let localSettings: PluginSettings;
 let previousExecutionCache: string[];
@@ -56,7 +61,7 @@ const getStatelessTemplate = (name: string, injectCode: string): string =>
 
 export const flutterMain = (
   sceneNode: ReadonlyArray<SceneNode>,
-  settings: PluginSettings
+  settings: PluginSettings,
 ): string => {
   localSettings = settings;
   previousExecutionCache = [];
@@ -67,17 +72,17 @@ export const flutterMain = (
       return result;
     case "stateless":
       result = generateWidgetCode("Column", { children: [result] });
-      return getStatelessTemplate(className(sceneNode[0].name), result);
+      return getStatelessTemplate(stringToClassName(sceneNode[0].name), result);
     case "fullApp":
       result = generateWidgetCode("Column", { children: [result] });
-      return getFullAppTemplate(className(sceneNode[0].name), result);
+      return getFullAppTemplate(stringToClassName(sceneNode[0].name), result);
   }
 
   return result;
 };
 
 const flutterWidgetGenerator = (
-  sceneNode: ReadonlyArray<SceneNode>
+  sceneNode: ReadonlyArray<SceneNode>,
 ): string => {
   let comp: string[] = [];
 
@@ -109,6 +114,9 @@ const flutterWidgetGenerator = (
       case "TEXT":
         comp.push(flutterText(node));
         break;
+      case "VECTOR":
+        addWarning("VectorNodes are not supported in Flutter");
+        break;
       default:
       // do nothing
     }
@@ -130,7 +138,7 @@ const flutterGroup = (node: GroupNode): string => {
     node,
     generateWidgetCode("Stack", {
       children: widget ? [widget] : [],
-    })
+    }),
   );
 };
 
@@ -139,8 +147,9 @@ const flutterContainer = (node: SceneNode, child: string): string => {
 
   let image = "";
   if ("fills" in node && retrieveTopFill(node.fills)?.type === "IMAGE") {
+    addWarning("Image fills are replaced with placeholders");
     image = `Image.network("https://via.placeholder.com/${node.width.toFixed(
-      0
+      0,
     )}x${node.height.toFixed(0)}")`;
   }
 
@@ -167,10 +176,13 @@ const flutterText = (node: TextNode): string => {
 };
 
 const flutterFrame = (
-  node: SceneNode & BaseFrameMixin & MinimalBlendMixin
+  node: SceneNode & BaseFrameMixin & MinimalBlendMixin,
 ): string => {
   const children = flutterWidgetGenerator(
-    commonSortChildrenWhenInferredAutoLayout(node, localSettings.optimizeLayout)
+    commonSortChildrenWhenInferredAutoLayout(
+      node,
+      localSettings.optimizeLayout,
+    ),
   );
 
   if (node.layoutMode !== "NONE") {
@@ -190,14 +202,14 @@ const flutterFrame = (
       node,
       generateWidgetCode("Stack", {
         children: children !== "" ? [children] : [],
-      })
+      }),
     );
   }
 };
 
 const makeRowColumn = (
   autoLayout: InferredAutoLayoutResult,
-  children: string
+  children: string,
 ): string => {
   const rowOrColumn = autoLayout.layoutMode === "HORIZONTAL" ? "Row" : "Column";
 
@@ -214,13 +226,12 @@ const makeRowColumn = (
 
 const addSpacingIfNeeded = (
   node: SceneNode,
-  optimizeLayout: boolean
+  optimizeLayout: boolean,
 ): string => {
   const nodeParentLayout =
     optimizeLayout && node.parent && "itemSpacing" in node.parent
       ? node.parent.inferredAutoLayout
-      // @ts-ignore
-      : null ?? node.parent;
+      : node.parent;
 
   if (
     nodeParentLayout &&

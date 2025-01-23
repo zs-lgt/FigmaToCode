@@ -10,12 +10,15 @@ import {
   pxToLineHeight,
 } from "./conversionTables";
 import { TailwindDefaultBuilder } from "./tailwindDefaultBuilder";
+import { config } from "./tailwindConfig";
 
 export class TailwindTextBuilder extends TailwindDefaultBuilder {
-  getTextSegments(id: string): { style: string; text: string }[] {
+  getTextSegments(id: string): {
+    style: string;
+    text: string;
+    openTypeFeatures: { [key: string]: boolean };
+  }[] {
     const segments = globalTextStyleSegments[id];
-
-    console.log('globalTextStyleSegments', segments)
     if (!segments) {
       return [];
     }
@@ -26,20 +29,19 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
       const textTransform = this.textTransform(segment.textCase);
       const lineHeightStyle = this.lineHeight(
         segment.lineHeight,
-        segment.fontSize
+        segment.fontSize,
       );
       const letterSpacingStyle = this.letterSpacing(
         segment.letterSpacing,
-        segment.fontSize
+        segment.fontSize,
       );
       // const textIndentStyle = this.indentStyle(segment.indentation);
-      console.log('segment', segment)
+
       const styleClasses = [
         color,
         this.fontSize(segment.fontSize),
         this.fontWeight(segment.fontWeight),
         this.fontFamily(segment.fontName),
-        this.lineClamp(segments.maxLines),
         textDecoration,
         textTransform,
         lineHeightStyle,
@@ -50,12 +52,16 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
         .join(" ");
 
       const charsWithLineBreak = segment.characters.split("\n").join("<br/>");
-      return { style: styleClasses, text: charsWithLineBreak };
+      return {
+        style: styleClasses,
+        text: charsWithLineBreak,
+        openTypeFeatures: segment.openTypeFeatures,
+      };
     });
   }
 
   getTailwindColorFromFills = (
-    fills: ReadonlyArray<Paint> | PluginAPI["mixed"]
+    fills: ReadonlyArray<Paint> | PluginAPI["mixed"],
   ) => {
     // Implement a function to convert fills to the appropriate Tailwind CSS color classes.
     // This can be based on your project's configuration and color palette.
@@ -68,28 +74,8 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
   };
 
   fontWeight = (fontWeight: number): string => {
-    switch (fontWeight) {
-      case 100:
-        return "font-thin";
-      case 200:
-        return "font-extralight";
-      case 300:
-        return "font-light";
-      case 400:
-        return "font-normal";
-      case 500:
-        return "font-medium";
-      case 600:
-        return "font-semibold";
-      case 700:
-        return "font-bold";
-      case 800:
-        return "font-extrabold";
-      case 900:
-        return "font-black";
-      default:
-        return "";
-    }
+    const weight = config.fontWeight[fontWeight];
+    return weight ? `font-${weight}` : "";
   };
 
   indentStyle = (indentation: number) => {
@@ -100,13 +86,18 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
   };
 
   fontFamily = (fontName: FontName): string => {
+    if (config.fontFamily.sans.includes(fontName.family)) {
+      return "font-sans";
+    }
+    if (config.fontFamily.serif.includes(fontName.family)) {
+      return "font-serif";
+    }
+    if (config.fontFamily.mono.includes(fontName.family)) {
+      return "font-mono";
+    }
+
     return "font-['" + fontName.family + "']";
   };
-
-  lineClamp = (node: TextNode) => {
-    this.addAttributes(node?.maxLines ? `line-clamp-${node.maxLines}` : '');
-    return this;
-  }
 
   /**
    * https://tailwindcss.com/docs/font-size/
@@ -179,9 +170,9 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
    * https://tailwindcss.com/docs/text-align/
    * example: text-justify
    */
-  textAlign(node: TextNode): this {
+  textAlign(): this {
     // if alignHorizontal is LEFT, don't do anything because that is native
-
+    const node = this.node as TextNode;
     // only undefined in testing
     if (node.textAlignHorizontal && node.textAlignHorizontal !== "LEFT") {
       // todo when node.textAutoResize === "WIDTH_AND_HEIGHT" and there is no \n in the text, this can be ignored.

@@ -18,7 +18,8 @@ import {
   commonIsAbsolutePosition,
   getCommonPositionValue,
 } from "../common/commonPosition";
-import { Modifier, SwiftUIElement } from "./builderImpl/swiftuiParser";
+import { SwiftUIElement } from "./builderImpl/swiftuiParser";
+import { SwiftUIModifier } from "types";
 
 export class SwiftuiDefaultBuilder {
   element: SwiftUIElement;
@@ -27,7 +28,7 @@ export class SwiftuiDefaultBuilder {
     this.element = new SwiftUIElement(kind);
   }
 
-  pushModifier(...args: (Modifier | null)[]): void {
+  pushModifier(...args: (SwiftUIModifier | null)[]): void {
     args.forEach((modifier) => {
       if (modifier) {
         this.element.addModifier(modifier);
@@ -48,7 +49,7 @@ export class SwiftuiDefaultBuilder {
       swiftuiVisibility(node),
       swiftuiRotation(node),
       swiftuiOpacity(node),
-      swiftuiBlendMode(node)
+      swiftuiBlendMode(node),
     );
 
     return this;
@@ -58,7 +59,7 @@ export class SwiftuiDefaultBuilder {
     x: number,
     y: number,
     node: SceneNode,
-    parent: (BaseNode & ChildrenMixin) | null
+    parent: (BaseNode & ChildrenMixin) | null,
   ): { centerX: number; centerY: number } {
     if (!parent || !("width" in parent)) {
       return { centerX: 0, centerY: 0 };
@@ -81,7 +82,7 @@ export class SwiftuiDefaultBuilder {
         x,
         y,
         node,
-        node.parent
+        node.parent,
       );
 
       this.pushModifier([
@@ -151,8 +152,8 @@ export class SwiftuiDefaultBuilder {
     if ("paddingLeft" in node) {
       this.pushModifier(
         swiftuiPadding(
-          (optimizeLayout ? node.inferredAutoLayout : null) ?? node
-        )
+          (optimizeLayout ? node.inferredAutoLayout : null) ?? node,
+        ),
       );
     }
     return this;

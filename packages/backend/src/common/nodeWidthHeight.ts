@@ -26,6 +26,7 @@ export const nodeSize = (
   // const parentLayoutMode = node.parent.layoutMode;
   const parentLayoutMode = optimizeLayout
     ? node.parent.inferredAutoLayout?.layoutMode
+    // @ts-ignore
     : null ?? node.parent.layoutMode;
 
   const isWidthFill =

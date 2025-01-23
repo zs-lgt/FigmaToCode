@@ -3,11 +3,12 @@ import { retrieveTopFill } from "../../common/retrieveFill";
 
 // retrieve the SOLID color on HTML
 export const htmlColorFromFills = (
-  fills: ReadonlyArray<Paint> | PluginAPI["mixed"]
+  fills: ReadonlyArray<Paint> | PluginAPI["mixed"] | undefined,
 ): string => {
   // kind can be text, bg, border...
   // [when testing] fills can be undefined
 
+  // @ts-ignore
   const fill = retrieveTopFill(fills);
   if (fill && fill.type === "SOLID") {
     // if fill isn't visible, it shouldn't be painted.
@@ -21,10 +22,7 @@ export const htmlColorFromFills = (
       fill.type === "GRADIENT_DIAMOND")
   ) {
     if (fill.gradientStops.length > 0) {
-      return htmlColor(
-        fill.gradientStops[0].color,
-        fill.opacity
-      );
+      return htmlColor(fill.gradientStops[0].color, fill.opacity);
     }
   }
 
@@ -59,7 +57,7 @@ export const htmlColor = (color: RGB, alpha: number = 1): string => {
 };
 
 export const htmlGradientFromFills = (
-  fills: ReadonlyArray<Paint> | PluginAPI["mixed"]
+  fills: ReadonlyArray<Paint> | PluginAPI["mixed"],
 ): string => {
   const fill = retrieveTopFill(fills);
   if (fill?.type === "GRADIENT_LINEAR") {
@@ -111,7 +109,7 @@ export const htmlLinearGradient = (fill: GradientPaint): string => {
 export const invertYCoordinate = (y: number): number => 1 - y;
 
 export const getGradientTransformCoordinates = (
-  gradientTransform: number[][]
+  gradientTransform: number[][],
 ): { centerX: string; centerY: string; radiusX: string; radiusY: string } => {
   const a = gradientTransform[0][0];
   const b = gradientTransform[0][1];

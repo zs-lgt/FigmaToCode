@@ -7,7 +7,6 @@ import {
   htmlBlendMode,
 } from "./builderImpl/htmlBlend";
 import {
-  htmlColor,
   htmlColorFromFills,
   htmlGradientFromFills,
 } from "./builderImpl/htmlColor";
@@ -18,43 +17,59 @@ import {
   commonIsAbsolutePosition,
   getCommonPositionValue,
 } from "../common/commonPosition";
-import { className, sliceNum } from "../common/numToAutoFixed";
+import { sliceNum, stringToClassName } from "../common/numToAutoFixed";
 import { commonStroke } from "../common/commonStroke";
+import {
+  formatClassAttribute,
+  formatDataAttribute,
+  formatStyleAttribute,
+} from "../common/commonFormatAttributes";
+import { HTMLSettings } from "types";
 
 export class HtmlDefaultBuilder {
   styles: Array<string>;
-  isJSX: boolean;
-  visible: boolean;
-  name: string = "";
+  data: Array<string>;
+  node: SceneNode;
+  settings: HTMLSettings;
 
-  constructor(node: SceneNode, showLayerName: boolean, optIsJSX: boolean) {
-    this.isJSX = optIsJSX;
-    this.styles = [];
-    this.visible = node.visible;
-    if (showLayerName) {
-      this.name = className(node.name);
-    }
+  get name() {
+    return this.settings.showLayerNames ? this.node.name : "";
+  }
+  get visible() {
+    return this.node.visible;
+  }
+  get isJSX() {
+    return this.settings.jsx;
+  }
+  get optimizeLayout() {
+    return this.settings.optimizeLayout;
   }
 
-  commonPositionStyles(
-    node: SceneNode & LayoutMixin & MinimalBlendMixin,
-    optimizeLayout: boolean
-  ): this {
-    this.size(node, optimizeLayout);
-    this.autoLayoutPadding(node, optimizeLayout);
-    this.position(node, optimizeLayout);
-    this.blend(node);
+  constructor(node: SceneNode, settings: HTMLSettings) {
+    this.node = node;
+    this.settings = settings;
+    this.styles = [];
+    this.data = [];
+  }
+
+  commonPositionStyles(): this {
+    this.size();
+    this.autoLayoutPadding();
+    this.position();
+    this.blend();
     return this;
   }
 
-  commonShapeStyles(node: GeometryMixin & SceneNode): this {
-    this.applyFillsToStyle(
-      node.fills,
-      node.type === "TEXT" ? "text" : "background"
-    );
-    this.shadow(node);
-    this.border(node);
-    this.blur(node);
+  commonShapeStyles(): this {
+    if ("fills" in this.node) {
+      this.applyFillsToStyle(
+        this.node.fills,
+        this.node.type === "TEXT" ? "text" : "background",
+      );
+    }
+    this.shadow();
+    this.border();
+    this.blur();
     return this;
   }
 
@@ -62,17 +77,19 @@ export class HtmlDefaultBuilder {
     this.styles.push(...newStyles.filter((style) => style));
   };
 
-  blend(node: SceneNode & LayoutMixin & MinimalBlendMixin): this {
+  blend(): this {
+    const { node, isJSX } = this;
     this.addStyles(
-      htmlVisibility(node, this.isJSX),
-      ...htmlRotation(node, this.isJSX),
-      htmlOpacity(node, this.isJSX),
-      htmlBlendMode(node, this.isJSX)
+      htmlVisibility(node, isJSX),
+      ...htmlRotation(node as LayoutMixin, isJSX),
+      htmlOpacity(node as MinimalBlendMixin, isJSX),
+      htmlBlendMode(node as MinimalBlendMixin, isJSX),
     );
     return this;
   }
 
-  border(node: GeometryMixin & SceneNode): this {
+  border(): this {
+    const { node } = this;
     this.addStyles(...htmlBorderRadius(node, this.isJSX));
 
     const commonBorder = commonStroke(node);
@@ -80,8 +97,10 @@ export class HtmlDefaultBuilder {
       return this;
     }
 
-    const color = htmlColorFromFills(node.strokes);
-    const borderStyle = node.dashPattern.length > 0 ? "dotted" : "solid";
+    const strokes = ("strokes" in node && node.strokes) || undefined;
+    const color = htmlColorFromFills(strokes);
+    const borderStyle =
+      "dashPattern" in node && node.dashPattern.length > 0 ? "dotted" : "solid";
 
     const consolidateBorders = (border: number): string =>
       [`${sliceNum(border)}px`, color, borderStyle].filter((d) => d).join(" ");
@@ -92,7 +111,7 @@ export class HtmlDefaultBuilder {
       }
       const weight = commonBorder.all;
       this.addStyles(
-        formatWithJSX("border", this.isJSX, consolidateBorders(weight))
+        formatWithJSX("border", this.isJSX, consolidateBorders(weight)),
       );
     } else {
       if (commonBorder.left !== 0) {
@@ -100,8 +119,8 @@ export class HtmlDefaultBuilder {
           formatWithJSX(
             "border-left",
             this.isJSX,
-            consolidateBorders(commonBorder.left)
-          )
+            consolidateBorders(commonBorder.left),
+          ),
         );
       }
       if (commonBorder.top !== 0) {
@@ -109,8 +128,8 @@ export class HtmlDefaultBuilder {
           formatWithJSX(
             "border-top",
             this.isJSX,
-            consolidateBorders(commonBorder.top)
-          )
+            consolidateBorders(commonBorder.top),
+          ),
         );
       }
       if (commonBorder.right !== 0) {
@@ -118,8 +137,8 @@ export class HtmlDefaultBuilder {
           formatWithJSX(
             "border-right",
             this.isJSX,
-            consolidateBorders(commonBorder.right)
-          )
+            consolidateBorders(commonBorder.right),
+          ),
         );
       }
       if (commonBorder.bottom !== 0) {
@@ -127,22 +146,23 @@ export class HtmlDefaultBuilder {
           formatWithJSX(
             "border-bottom",
             this.isJSX,
-            consolidateBorders(commonBorder.bottom)
-          )
+            consolidateBorders(commonBorder.bottom),
+          ),
         );
       }
     }
     return this;
   }
 
-  position(node: SceneNode, optimizeLayout: boolean): this {
+  position(): this {
+    const { node, optimizeLayout, isJSX } = this;
     if (commonIsAbsolutePosition(node, optimizeLayout)) {
       const { x, y } = getCommonPositionValue(node);
 
       this.addStyles(
-        formatWithJSX("left", this.isJSX, x),
-        formatWithJSX("top", this.isJSX, y),
-        formatWithJSX("position", this.isJSX, "absolute")
+        formatWithJSX("left", isJSX, x),
+        formatWithJSX("top", isJSX, y),
+        formatWithJSX("position", isJSX, "absolute"),
       );
     } else {
       if (
@@ -151,7 +171,7 @@ export class HtmlDefaultBuilder {
           ((optimizeLayout ? node.inferredAutoLayout : null) ?? node)
             ?.layoutMode === "NONE")
       ) {
-        this.addStyles(formatWithJSX("position", this.isJSX, "relative"));
+        this.addStyles(formatWithJSX("position", isJSX, "relative"));
       }
     }
 
@@ -160,11 +180,11 @@ export class HtmlDefaultBuilder {
 
   applyFillsToStyle(
     paintArray: ReadonlyArray<Paint> | PluginAPI["mixed"],
-    property: "text" | "background"
+    property: "text" | "background",
   ): this {
     if (property === "text") {
       this.addStyles(
-        formatWithJSX("text", this.isJSX, htmlColorFromFills(paintArray))
+        formatWithJSX("text", this.isJSX, htmlColorFromFills(paintArray)),
       );
       return this;
     }
@@ -178,7 +198,7 @@ export class HtmlDefaultBuilder {
   }
 
   buildBackgroundValues(
-    paintArray: ReadonlyArray<Paint> | PluginAPI["mixed"]
+    paintArray: ReadonlyArray<Paint> | PluginAPI["mixed"],
   ): string {
     if (paintArray === figma.mixed) {
       return "";
@@ -208,20 +228,24 @@ export class HtmlDefaultBuilder {
     return styles.filter((value) => value !== "").join(", ");
   }
 
-  shadow(node: SceneNode): this {
+  shadow(): this {
+    const { node, isJSX } = this;
     if ("effects" in node) {
       const shadow = htmlShadow(node);
       if (shadow) {
-        this.addStyles(
-          formatWithJSX("box-shadow", this.isJSX, htmlShadow(node))
-        );
+        this.addStyles(formatWithJSX("box-shadow", isJSX, htmlShadow(node)));
       }
     }
     return this;
   }
 
-  size(node: SceneNode, optimize: boolean): this {
-    const { width, height } = htmlSizePartial(node, this.isJSX, optimize);
+  size(): this {
+    const { node, settings } = this;
+    const { width, height } = htmlSizePartial(
+      node,
+      settings.jsx,
+      settings.optimizeLayout,
+    );
 
     if (node.type === "TEXT") {
       switch (node.textAutoResize) {
@@ -242,65 +266,72 @@ export class HtmlDefaultBuilder {
     return this;
   }
 
-  autoLayoutPadding(node: SceneNode, optimizeLayout: boolean): this {
+  autoLayoutPadding(): this {
+    const { node, isJSX, optimizeLayout } = this;
     if ("paddingLeft" in node) {
       this.addStyles(
         ...htmlPadding(
           (optimizeLayout ? node.inferredAutoLayout : null) ?? node,
-          this.isJSX
-        )
+          isJSX,
+        ),
       );
     }
     return this;
   }
 
-  blur(node: SceneNode) {
+  blur() {
+    const { node } = this;
     if ("effects" in node && node.effects.length > 0) {
       const blur = node.effects.find(
-        (e) => e.type === "LAYER_BLUR" && e.visible
+        (e) => e.type === "LAYER_BLUR" && e.visible,
       );
       if (blur) {
         this.addStyles(
           formatWithJSX(
             "filter",
             this.isJSX,
-            `blur(${sliceNum(blur.radius)}px)`
-          )
+            `blur(${sliceNum(blur.radius)}px)`,
+          ),
         );
       }
 
       const backgroundBlur = node.effects.find(
-        (e) => e.type === "BACKGROUND_BLUR" && e.visible
+        (e) => e.type === "BACKGROUND_BLUR" && e.visible,
       );
       if (backgroundBlur) {
         this.addStyles(
           formatWithJSX(
             "backdrop-filter",
             this.isJSX,
-            `blur(${sliceNum(backgroundBlur.radius)}px)`
-          )
+            `blur(${sliceNum(backgroundBlur.radius)}px)`,
+          ),
         );
       }
     }
   }
 
+  addData(label: string, value?: string): this {
+    const attribute = formatDataAttribute(label, value);
+    this.data.push(attribute);
+    return this;
+  }
+
   build(additionalStyle: Array<string> = []): string {
     this.addStyles(...additionalStyle);
 
-    const formattedStyles = this.styles.map((s) => s.trim());
-    let formattedStyle = "";
-    if (this.styles.length > 0) {
-      if (this.isJSX) {
-        formattedStyle = ` style={{${formattedStyles.join(", ")}}}`;
-      } else {
-        formattedStyle = ` style="${formattedStyles.join("; ")}"`;
-      }
+    let classAttribute = "";
+    if (this.name) {
+      this.addData("layer", this.name);
+      const layerNameClass = stringToClassName(this.name);
+      classAttribute = formatClassAttribute(
+        layerNameClass === "" ? [] : [layerNameClass],
+        this.isJSX,
+      );
     }
-    if (this.name.length > 0) {
-      const classOrClassName = this.isJSX ? "className" : "class";
-      return ` ${classOrClassName}="${this.name}"${formattedStyle}`;
-    } else {
-      return formattedStyle;
-    }
+
+    const dataAttributes = this.data.join("");
+    const styleAttribute = formatStyleAttribute(this.styles, this.isJSX);
+
+    return `${dataAttributes}${classAttribute}${styleAttribute}`;
   }
 }
