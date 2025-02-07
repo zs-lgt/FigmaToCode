@@ -209,7 +209,7 @@ const standardMode = async () => {
       console.log(msg);
       const nodes = figma.currentPage.children;
       exportNodes(nodes, msg.optimize).then(async nodesData => {
-        const { nodesInfo, description, images, optimize } = nodesData;
+        const { nodesInfo, description, components, images, optimize } = nodesData;
         const imagesData = [];
         for (const imageId of images) {
           const imageBase64 = await getNodeExportImage(imageId.id);
@@ -229,6 +229,7 @@ const standardMode = async () => {
           type: "export-nodes-result",
           data: {
             nodesInfo: JSON.stringify(nodesInfo, null, 2),
+            components: JSON.stringify(components, null, 2),
             description,
             images: imagesData,
             optimize,

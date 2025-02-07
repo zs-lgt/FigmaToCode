@@ -8,45 +8,87 @@ import {
 
 export { getNodeExportImage };
 
-export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean, filterSymbols: boolean = true) => {
-  // 获取节点信息
-  const nodesInfo = nodes.map(node => getNodeInfo(node));
-  let description = '';
-  let filteredNodes = nodesInfo;
-  // 仅保留#开头的节点并提取描述信息
-  filterSymbols &&  (filteredNodes = nodesInfo
-    .map(node => {
-      if (node.name === '#comments') {
-        description = extractCommentDescription(node);
+// 递归处理节点及其子节点
+const processNode = (node: SceneNode, components: { [key: string]: any }) => {
+  // 如果是INSTANCE节点，将其存入components
+  if (node.type === 'INSTANCE') {
+    const instanceNode = node as InstanceNode;
+    // 如果这个组件还没有被存储
+    if (!components[instanceNode.name]) {
+      // 存储完整的节点信息，包括子节点
+      const fullNodeInfo = getNodeInfo(instanceNode);
+      if ('children' in instanceNode && instanceNode.children) {
+        fullNodeInfo.children = instanceNode.children.map(child => 
+          getNodeInfo(child)
+        );
       }
-      return filterHashNodes(node);
-    })
-    .filter(node => node !== null && node.name !== '#comments'))
+      components[instanceNode.name] = fullNodeInfo;
+    }
+    // 返回简化的INSTANCE节点信息
+    return {
+      id: instanceNode.id,
+      componentId: instanceNode.name,
+      type: 'INSTANCE',
+      x: instanceNode.x,
+      y: instanceNode.y,
+      componentProperties: instanceNode.componentProperties || {}
+    };
+  }
 
-  // 导出节点信息和图片
+  // 如果节点有子节点，递归处理
+  if ('children' in node && node.children) {
+    const processedNode = getNodeInfo(node);
+    processedNode.children = node.children.map(child => 
+      processNode(child, components)
+    );
+    return processedNode;
+  }
+
+  // 其他类型节点直接返回完整信息
+  return getNodeInfo(node);
+};
+
+export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean, filterSymbols: boolean = true) => {
+  let description = '';
+  const components: { [key: string]: any } = {};
   const exportedNodes = [];
-  // const exportedImages = [];
   const exportedImages = [];
 
-  for (const node of filteredNodes) {
+  // 处理所有节点
+  for (const node of nodes) {
     try {
-      // const imageBase64 = await getNodeExportImage(node.id);
-      exportedImages.push({
-        name: node.name,
-        id: node.id
-      });
-      // 保存节点信息（不包含图片数据）
-      const processedNode = optimize ? cleanExportData(node) : node;
-      exportedNodes.push(processedNode);
+      // 如果是注释节点，提取描述信息
+      if (node.name === '#comments') {
+        description = extractCommentDescription(node);
+        continue;
+      }
+
+      // 如果需要过滤且不是#开头的节点，跳过
+      if (filterSymbols && !node.name.startsWith('#')) {
+        continue;
+      }
+
+      // 处理节点及其子节点
+      const processedNode = processNode(node, components);
+      if (processedNode) {
+        exportedNodes.push(optimize ? cleanExportData(processedNode) : processedNode);
+        exportedImages.push({
+          name: node.name,
+          id: node.id
+        });
+      }
     } catch (error) {
       console.error(`处理节点 ${node.name} 时出错:`, error);
     }
   }
-  console.log(description);
+console.log(
+  'zhangxian', exportedNodes, components
+);
+
   return {
-    nodesInfo: exportedNodes,
-    description: description,
-    // images: exportedImages,
+    nodesInfo: exportedNodes,  // ui.json的内容
+    components,               // components.json的内容
+    description,
     images: exportedImages,
     optimize,
   }
