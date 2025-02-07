@@ -41,6 +41,12 @@ export class TextNodeCreator extends BaseNodeCreator {
         fontName = { family: "Inter", style: "Regular" };
       }
 
+      // 检查是否在代理环境中
+      if (!figma.__PROXY__) {
+        console.warn('Not in proxy environment, using default font');
+        return fontName;
+      }
+
       // Get available fonts
       const availableFonts = await figma.listAvailableFontsAsync();
       
@@ -95,22 +101,16 @@ export class TextNodeCreator extends BaseNodeCreator {
           console.log(`Successfully loaded font: ${matchedFont.fontName.family} ${matchedFont.fontName.style}`);
           return matchedFont.fontName;
         } catch (error) {
-          console.warn(`Failed to load matched font ${matchedFont.fontName.family} ${matchedFont.fontName.style}, falling back to Inter:`, error);
+          console.warn(`Failed to load matched font ${matchedFont.fontName.family} ${matchedFont.fontName.style}, falling back to default:`, error);
+          return fontName;
         }
       } else {
-        console.warn(`No matching font found for ${fontName.family} ${fontName.style}, falling back to Inter`);
+        console.warn(`No matching font found for ${fontName.family} ${fontName.style}, falling back to default`);
+        return fontName;
       }
-
-      // Fallback to Inter
-      const fallbackFont = { family: "Inter", style: "Regular" };
-      await figma.loadFontAsync(fallbackFont);
-      return fallbackFont;
-
     } catch (error) {
-      console.warn('Font loading error, falling back to Inter:', error);
-      const fallbackFont = { family: "Inter", style: "Regular" };
-      await figma.loadFontAsync(fallbackFont);
-      return fallbackFont;
+      console.warn('Font loading error, falling back to default:', error);
+      return fontName;
     }
   }
 
@@ -133,6 +133,9 @@ export class TextNodeCreator extends BaseNodeCreator {
         node.textAutoResize = "WIDTH_AND_HEIGHT";
       }
 
+      // 检查是否在代理环境中
+      const isProxy = !!figma.__PROXY__;
+
       // Apply text segments if available
       if (style.textSegments && Array.isArray(style.textSegments)) {
         try {
@@ -152,27 +155,29 @@ export class TextNodeCreator extends BaseNodeCreator {
             // Insert text
             node.insertCharacters(start, segment.characters);
             
-            // Apply segment-specific styles
-            if (segment.fontSize) {
-              node.setRangeFontSize(start, start + segment.characters.length, segment.fontSize);
-            }
-            if (segment.fontName) {
-              node.setRangeFontName(start, start + segment.characters.length, segment.fontName);
-            }
-            if (segment.fills) {
-              node.setRangeFills(start, start + segment.characters.length, this.processFills(segment.fills));
-            }
-            if (segment.textDecoration) {
-              node.setRangeTextDecoration(start, start + segment.characters.length, segment.textDecoration);
-            }
-            if (segment.letterSpacing) {
-              node.setRangeLetterSpacing(start, start + segment.characters.length, segment.letterSpacing);
-            }
-            if (segment.lineHeight) {
-              node.setRangeLineHeight(start, start + segment.characters.length, segment.lineHeight);
-            }
-            if (segment.textCase) {
-              node.setRangeTextCase(start, start + segment.characters.length, segment.textCase);
+            // 只在代理环境中应用文本样式
+            if (isProxy) {
+              if (segment.fontSize) {
+                node.setRangeFontSize(start, start + segment.characters.length, segment.fontSize);
+              }
+              if (segment.fontName) {
+                node.setRangeFontName(start, start + segment.characters.length, segment.fontName);
+              }
+              if (segment.fills) {
+                node.setRangeFills(start, start + segment.characters.length, this.processFills(segment.fills));
+              }
+              if (segment.textDecoration) {
+                node.setRangeTextDecoration(start, start + segment.characters.length, segment.textDecoration);
+              }
+              if (segment.letterSpacing) {
+                node.setRangeLetterSpacing(start, start + segment.characters.length, segment.letterSpacing);
+              }
+              if (segment.lineHeight) {
+                node.setRangeLineHeight(start, start + segment.characters.length, segment.lineHeight);
+              }
+              if (segment.textCase) {
+                node.setRangeTextCase(start, start + segment.characters.length, segment.textCase);
+              }
             }
           }
         } catch (error) {
@@ -200,9 +205,8 @@ export class TextNodeCreator extends BaseNodeCreator {
           vertical: "MIN"
         };
       }
-
     } catch (error) {
-      console.error('Error applying text styles:', error);
+      console.warn('Failed to apply text styles:', error);
     }
   }
 }

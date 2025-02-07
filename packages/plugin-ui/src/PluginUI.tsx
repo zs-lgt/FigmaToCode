@@ -149,7 +149,7 @@ export const PluginUI = (props: PluginUIProps) => {
     parent.postMessage({ 
       pluginMessage: { 
         type: 'export-selected-nodes',
-        optimize: true,
+        optimize: false,
       }
     }, '*');
   };
