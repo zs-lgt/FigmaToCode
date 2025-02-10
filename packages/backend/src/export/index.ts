@@ -86,8 +86,8 @@ console.log(
 );
 
   return {
-    nodesInfo: exportedNodes,  // ui.json的内容
-    components,               // components.json的内容
+    nodesInfo: exportedNodes,
+    components,
     description,
     images: exportedImages,
     optimize,
