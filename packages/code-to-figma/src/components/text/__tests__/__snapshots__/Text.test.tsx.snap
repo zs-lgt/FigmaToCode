@@ -1,0 +1,328 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`<Text /> Text got full width when display: block (wrapped to array) 1`] = `
+<text
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0,
+          "g": 0,
+          "r": 0,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  fontName={
+    Object {
+      "family": "Inter",
+      "style": "Regular",
+    }
+  }
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  loadedFont={null}
+  style={
+    Object {
+      "display": "block",
+      "minWidth": "100%",
+    }
+  }
+/>
+`;
+
+exports[`<Text /> Text got full width when display: block 1`] = `
+<text
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0,
+          "g": 0,
+          "r": 0,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  fontName={
+    Object {
+      "family": "Inter",
+      "style": "Regular",
+    }
+  }
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  loadedFont={null}
+  style={
+    Object {
+      "display": "block",
+      "minWidth": "100%",
+    }
+  }
+/>
+`;
+
+exports[`<Text /> Text with fontFamily 1`] = `
+<text
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0,
+          "g": 0,
+          "r": 0,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  fontName={
+    Object {
+      "family": "Helvetica",
+      "style": "Regular",
+    }
+  }
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  loadedFont={null}
+  style={
+    Object {
+      "fontFamily": "Helvetica",
+    }
+  }
+/>
+`;
+
+exports[`<Text /> Text with fontFamily, fontWeight 1`] = `
+<text
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0,
+          "g": 0,
+          "r": 0,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  fontName={
+    Object {
+      "family": "Helvetica",
+      "style": "Bold",
+    }
+  }
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  loadedFont={null}
+  style={
+    Object {
+      "fontFamily": "Helvetica",
+      "fontWeight": "bold",
+    }
+  }
+/>
+`;
+
+exports[`<Text /> Text with fontFamily, fontWeight, fontStyle 1`] = `
+<text
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0,
+          "g": 0,
+          "r": 0,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  fontName={
+    Object {
+      "family": "Helvetica",
+      "style": "Bold Italic",
+    }
+  }
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  loadedFont={null}
+  style={
+    Object {
+      "fontFamily": "Helvetica",
+      "fontStyle": "italic",
+      "fontWeight": "bold",
+    }
+  }
+/>
+`;
+
+exports[`<Text /> Text with hyperlink 1`] = `
+<text
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 1,
+          "g": 0.5568627450980392,
+          "r": 0.18823529411764706,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  fontName={
+    Object {
+      "family": "Inter",
+      "style": "Regular",
+    }
+  }
+  hyperlink={
+    Object {
+      "type": "URL",
+      "value": "https://react-figma.dev/",
+    }
+  }
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  loadedFont={null}
+  style={
+    Object {
+      "color": "#308eff",
+    }
+  }
+>
+  React Figma website
+</text>
+`;
+
+exports[`<Text /> Text with maxWidth 1`] = `
+<text
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0,
+          "g": 0,
+          "r": 0,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  fontName={
+    Object {
+      "family": "Inter",
+      "style": "Regular",
+    }
+  }
+  hasDefinedWidth="100%"
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  loadedFont={null}
+  style={
+    Object {
+      "maxWidth": "100%",
+    }
+  }
+/>
+`;
+
+exports[`<Text /> Text with width 1`] = `
+<text
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0,
+          "g": 0,
+          "r": 0,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  fontName={
+    Object {
+      "family": "Inter",
+      "style": "Regular",
+    }
+  }
+  hasDefinedWidth={200}
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  loadedFont={null}
+  style={
+    Object {
+      "width": 200,
+    }
+  }
+  width={200}
+/>
+`;
+
+exports[`<Text /> Text without props 1`] = `
+<text
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0,
+          "g": 0,
+          "r": 0,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  fontName={
+    Object {
+      "family": "Inter",
+      "style": "Regular",
+    }
+  }
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  loadedFont={null}
+  style={Object {}}
+/>
+`;

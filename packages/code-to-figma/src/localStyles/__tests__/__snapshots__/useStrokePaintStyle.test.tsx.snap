@@ -1,0 +1,132 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`useStrokePaintStyle useStrokePaintStyle correctly applied 1`] = `
+ChildrenMixinStub {
+  "children": Array [
+    ExportMixinStub {
+      "children": Array [],
+      "config": undefined,
+      "id": "0:1",
+      "parent": [Circular],
+      "type": "PAGE",
+    },
+    ExportMixinStub {
+      "_backgrounds": Array [
+        Object {
+          "blendMode": "NORMAL",
+          "color": Object {
+            "b": 0.9607843160629272,
+            "g": 0.9607843160629272,
+            "r": 0.9607843160629272,
+          },
+          "opacity": 1,
+          "type": "SOLID",
+          "visible": true,
+        },
+      ],
+      "children": Array [
+        GeometryMixinStub {
+          "_fills": Array [
+            Object {
+              "color": Object {
+                "b": 0.10980392156862745,
+                "g": 1,
+                "r": 0.4627450980392157,
+              },
+              "opacity": 1,
+              "type": "SOLID",
+            },
+          ],
+          "blendMode": "NORMAL",
+          "config": Object {
+            "isWithoutTimeout": false,
+            "simulateErrors": true,
+          },
+          "constraints": Object {
+            "horizontal": "MIN",
+            "vertical": "MIN",
+          },
+          "cornerRadius": 0,
+          "cornerSmoothing": 0,
+          "effects": Array [],
+          "exportSettings": Array [],
+          "id": "1:2",
+          "isMask": false,
+          "layoutAlign": "INHERIT",
+          "layoutGrow": 0,
+          "locked": false,
+          "opacity": 1,
+          "parent": [Circular],
+          "pluginData": Object {
+            "isReactFigmaNode": "true",
+            "reactStyle": "{\\"backgroundColor\\":\\"#76ff1c\\",\\"borderColor\\":\\"#ffffff\\",\\"borderWidth\\":5,\\"strokeStyleId\\":\\"S:test,\\"}",
+          },
+          "strokeAlign": "INSIDE",
+          "strokeCap": "NONE",
+          "strokeStyleId": "S:test,",
+          "strokeWeight": 5,
+          "strokes": Array [
+            Object {
+              "color": Object {
+                "b": 1,
+                "g": 1,
+                "r": 1,
+              },
+              "opacity": 1,
+              "type": "SOLID",
+            },
+          ],
+          "type": "RECTANGLE",
+          "visible": true,
+        },
+      ],
+      "config": Object {
+        "isWithoutTimeout": false,
+        "simulateErrors": true,
+      },
+      "exportSettings": Array [],
+      "id": "1:1",
+      "parent": [Circular],
+      "pluginData": Object {
+        "isReactFigmaNode": "true",
+        "reactStyle": "{}",
+      },
+      "type": "PAGE",
+    },
+  ],
+  "config": undefined,
+  "id": "0:0",
+  "type": "DOCUMENT",
+}
+`;
+
+exports[`useStrokePaintStyle useStrokePaintStyle correctly applied 2`] = `
+Array [
+  PaintStyleStub {
+    "id": "S:test,",
+    "name": "root/background",
+    "paints": Array [
+      Object {
+        "color": Object {
+          "b": 1,
+          "g": 1,
+          "r": 1,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ],
+    "remote": false,
+    "styleBasics": Object {
+      "effectStyles": Array [],
+      "gridStyles": Array [],
+      "paintStyles": [Circular],
+      "styles": Map {
+        "S:test," => [Circular],
+      },
+      "textStyles": Array [],
+    },
+    "type": "PAINT",
+  },
+]
+`;

@@ -1,0 +1,242 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`transformTextStyleProperties letterSpacing "50%" 1`] = `
+Object {
+  "fills": Array [
+    Object {
+      "color": Object {
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "opacity": 1,
+      "type": "SOLID",
+    },
+  ],
+  "fontName": Object {
+    "family": "Inter",
+    "style": "Regular",
+  },
+  "letterSpacing": Object {
+    "unit": "PERCENT",
+    "value": 50,
+  },
+}
+`;
+
+exports[`transformTextStyleProperties letterSpacing 1.4 1`] = `
+Object {
+  "fills": Array [
+    Object {
+      "color": Object {
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "opacity": 1,
+      "type": "SOLID",
+    },
+  ],
+  "fontName": Object {
+    "family": "Inter",
+    "style": "Regular",
+  },
+  "letterSpacing": Object {
+    "unit": "PIXELS",
+    "value": 1.4,
+  },
+}
+`;
+
+exports[`transformTextStyleProperties lineHeight "50%" 1`] = `
+Object {
+  "fills": Array [
+    Object {
+      "color": Object {
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "opacity": 1,
+      "type": "SOLID",
+    },
+  ],
+  "fontName": Object {
+    "family": "Inter",
+    "style": "Regular",
+  },
+  "lineHeight": Object {
+    "unit": "PERCENT",
+    "value": 50,
+  },
+}
+`;
+
+exports[`transformTextStyleProperties lineHeight 1.4 1`] = `
+Object {
+  "fills": Array [
+    Object {
+      "color": Object {
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "opacity": 1,
+      "type": "SOLID",
+    },
+  ],
+  "fontName": Object {
+    "family": "Inter",
+    "style": "Regular",
+  },
+  "lineHeight": Object {
+    "unit": "PIXELS",
+    "value": 14,
+  },
+}
+`;
+
+exports[`transformTextStyleProperties lineHeight auto 1`] = `
+Object {
+  "fills": Array [
+    Object {
+      "color": Object {
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "opacity": 1,
+      "type": "SOLID",
+    },
+  ],
+  "fontName": Object {
+    "family": "Inter",
+    "style": "Regular",
+  },
+  "lineHeight": Object {
+    "unit": "AUTO",
+  },
+}
+`;
+
+exports[`transformTextStyleProperties text shadow 1`] = `
+Object {
+  "effects": Array [
+    Object {
+      "blendMode": "NORMAL",
+      "color": Object {
+        "a": 1,
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "offset": Object {
+        "x": 10,
+        "y": 20,
+      },
+      "radius": 15,
+      "spread": 0,
+      "type": "DROP_SHADOW",
+      "visible": true,
+    },
+  ],
+  "fills": Array [
+    Object {
+      "color": Object {
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "opacity": 1,
+      "type": "SOLID",
+    },
+  ],
+  "fontName": Object {
+    "family": "Inter",
+    "style": "Regular",
+  },
+}
+`;
+
+exports[`transformTextStyleProperties textAlign auto 1`] = `
+Object {
+  "fills": Array [
+    Object {
+      "color": Object {
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "opacity": 1,
+      "type": "SOLID",
+    },
+  ],
+  "fontName": Object {
+    "family": "Inter",
+    "style": "Regular",
+  },
+}
+`;
+
+exports[`transformTextStyleProperties textAlign center 1`] = `
+Object {
+  "fills": Array [
+    Object {
+      "color": Object {
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "opacity": 1,
+      "type": "SOLID",
+    },
+  ],
+  "fontName": Object {
+    "family": "Inter",
+    "style": "Regular",
+  },
+  "textAlignHorizontal": "CENTER",
+}
+`;
+
+exports[`transformTextStyleProperties textAlign justify 1`] = `
+Object {
+  "fills": Array [
+    Object {
+      "color": Object {
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "opacity": 1,
+      "type": "SOLID",
+    },
+  ],
+  "fontName": Object {
+    "family": "Inter",
+    "style": "Regular",
+  },
+  "textAlignHorizontal": "JUSTIFIED",
+}
+`;
+
+exports[`transformTextStyleProperties textDecorationLine line-through 1`] = `
+Object {
+  "fills": Array [
+    Object {
+      "color": Object {
+        "b": 0,
+        "g": 0,
+        "r": 0,
+      },
+      "opacity": 1,
+      "type": "SOLID",
+    },
+  ],
+  "fontName": Object {
+    "family": "Inter",
+    "style": "Regular",
+  },
+  "textDecorationLine": "STRIKETHROUGH",
+}
+`;

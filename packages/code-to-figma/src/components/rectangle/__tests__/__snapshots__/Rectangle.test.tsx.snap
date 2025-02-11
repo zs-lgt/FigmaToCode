@@ -1,0 +1,213 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`<Rectangle /> Loading backgroundImage 1`] = `
+ChildrenMixinStub {
+  "children": Array [
+    ExportMixinStub {
+      "children": Array [],
+      "config": undefined,
+      "id": "0:1",
+      "parent": [Circular],
+      "type": "PAGE",
+    },
+    ExportMixinStub {
+      "_backgrounds": Array [
+        Object {
+          "blendMode": "NORMAL",
+          "color": Object {
+            "b": 0.9607843160629272,
+            "g": 0.9607843160629272,
+            "r": 0.9607843160629272,
+          },
+          "opacity": 1,
+          "type": "SOLID",
+          "visible": true,
+        },
+      ],
+      "children": Array [
+        GeometryMixinStub {
+          "_fills": Array [
+            Object {
+              "imageHash": "<image hash>",
+              "scaleMode": "FILL",
+              "type": "IMAGE",
+            },
+          ],
+          "blendMode": "NORMAL",
+          "config": Object {
+            "isWithoutTimeout": false,
+            "simulateErrors": true,
+          },
+          "constraints": Object {
+            "horizontal": "MIN",
+            "vertical": "MIN",
+          },
+          "cornerRadius": 0,
+          "cornerSmoothing": 0,
+          "effects": Array [],
+          "exportSettings": Array [],
+          "id": "1:2",
+          "isMask": false,
+          "layoutAlign": "INHERIT",
+          "layoutGrow": 0,
+          "locked": false,
+          "opacity": 1,
+          "parent": [Circular],
+          "pluginData": Object {
+            "isReactFigmaNode": "true",
+            "reactStyle": "{\\"backgroundImage\\":\\"https://avatars1.githubusercontent.com/u/54585419\\"}",
+          },
+          "strokeAlign": "INSIDE",
+          "strokeCap": "NONE",
+          "strokeWeight": 0,
+          "strokes": Array [],
+          "type": "RECTANGLE",
+          "visible": true,
+          "x": 0,
+          "y": 0,
+        },
+      ],
+      "config": Object {
+        "isWithoutTimeout": false,
+        "simulateErrors": true,
+      },
+      "exportSettings": Array [],
+      "id": "1:1",
+      "parent": [Circular],
+      "pluginData": Object {
+        "isReactFigmaNode": "true",
+        "reactStyle": "{}",
+      },
+      "type": "PAGE",
+    },
+  ],
+  "config": undefined,
+  "id": "0:0",
+  "type": "DOCUMENT",
+}
+`;
+
+exports[`<Rectangle /> Rectangle with border props 1`] = `
+<rectangle
+  height={100}
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  strokeWeight={10}
+  strokes={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0.1607843137254902,
+          "g": 0.5450980392156862,
+          "r": 1,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  style={
+    Object {
+      "borderColor": "#ff8b29",
+      "borderWidth": 10,
+      "height": 100,
+      "width": 200,
+    }
+  }
+  width={200}
+/>
+`;
+
+exports[`<Rectangle /> Rectangle with color background 1`] = `
+<rectangle
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0,
+          "g": 1,
+          "r": 0.10588235294117647,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  style={
+    Object {
+      "backgroundColor": "#1bff00",
+    }
+  }
+/>
+`;
+
+exports[`<Rectangle /> Rectangle with image background 1`] = `
+<rectangle
+  fills={
+    Array [
+      Object {
+        "color": Object {
+          "b": 0.1607843137254902,
+          "g": 0.5450980392156862,
+          "r": 1,
+        },
+        "opacity": 1,
+        "type": "SOLID",
+      },
+    ]
+  }
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  style={
+    Object {
+      "backgroundColor": "#ff8b29",
+      "backgroundImage": "./image.png",
+      "backgroundSize": "cover",
+    }
+  }
+/>
+`;
+
+exports[`<Rectangle /> Rectangle with layout style properties 1`] = `
+<rectangle
+  height={200}
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  style={
+    Object {
+      "height": 200,
+      "left": 20,
+      "top": 50,
+      "width": 100,
+    }
+  }
+  width={100}
+  x={20}
+  y={50}
+/>
+`;
+
+exports[`<Rectangle /> Rectangle without props 1`] = `
+<rectangle
+  innerRef={
+    Object {
+      "current": undefined,
+    }
+  }
+  style={Object {}}
+/>
+`;
