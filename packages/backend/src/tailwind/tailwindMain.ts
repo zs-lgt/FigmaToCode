@@ -43,7 +43,6 @@ const getNodeExportImage = async (nodeId: string) => {
     // 使用节点的导出设置导出图片
     // @ts-ignore
     const settings = node.exportSettings[0];
-    console.log("[getNodeExportImage] settings:", settings);
     
     // @ts-ignore
     const bytes = await node.exportAsync({

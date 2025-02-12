@@ -92,7 +92,6 @@ export class TextNodeCreator extends BaseNodeCreator {
       if (matchedFont) {
         try {
           await figma.loadFontAsync(matchedFont.fontName);
-          console.log(`Successfully loaded font: ${matchedFont.fontName.family} ${matchedFont.fontName.style}`);
           return matchedFont.fontName;
         } catch (error) {
           console.warn(`Failed to load matched font ${matchedFont.fontName.family} ${matchedFont.fontName.style}, falling back to Inter:`, error);

@@ -161,9 +161,6 @@ export const PluginUI = (props: PluginUIProps) => {
 
   // 合并UI JSON和Components JSON的函数
   const mergeJsonData = (uiJson: any, componentsJson: any) => {
-    console.log('UI JSON:', JSON.stringify(uiJson, null, 2));
-    console.log('Components JSON:', JSON.stringify(componentsJson, null, 2));
-
     const mergeNode = (node: any) => {
       // 如果是INSTANCE节点，合并组件信息
       if (node.type === 'INSTANCE' && node.componentId) {
@@ -204,7 +201,6 @@ export const PluginUI = (props: PluginUIProps) => {
       ? uiJson.map(mergeNode)
       : mergeNode(uiJson);
 
-    console.log('Merged JSON:', JSON.stringify(result, null, 2));
     return result;
   };
 

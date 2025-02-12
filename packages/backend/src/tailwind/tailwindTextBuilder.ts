@@ -15,7 +15,6 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
   getTextSegments(id: string): { style: string; text: string }[] {
     const segments = globalTextStyleSegments[id];
 
-    console.log('globalTextStyleSegments', segments)
     if (!segments) {
       return [];
     }
@@ -33,7 +32,6 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
         segment.fontSize
       );
       // const textIndentStyle = this.indentStyle(segment.indentation);
-      console.log('segment', segment)
       const styleClasses = [
         color,
         this.fontSize(segment.fontSize),

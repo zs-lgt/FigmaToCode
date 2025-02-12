@@ -28,7 +28,6 @@ const processNode = async (node: SceneNode, components: { [key: string]: any }) 
     // 获取主组件信息
     const mainComponent = await instanceNode.getMainComponentAsync();
     const key = mainComponent?.key || null;
-    console.log('jjlin', key);
     // 返回简化的INSTANCE节点信息
     return {
       id: instanceNode.id,
@@ -88,9 +87,6 @@ export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean
       console.error(`处理节点 ${node.name} 时出错:`, error);
     }
   }
-console.log(
-  'zhangxian', exportedNodes, components
-);
 
   return {
     nodesInfo: exportedNodes,

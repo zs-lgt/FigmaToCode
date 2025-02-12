@@ -24,7 +24,6 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
           try {
             const instance : InstanceNode = figma.getNodeById(data.id);
             const component = await instance?.getMainComponentAsync();
-            console.log('shiyang', instance);
             
             if (component) {
               // 创建实例

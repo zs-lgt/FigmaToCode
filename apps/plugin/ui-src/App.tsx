@@ -42,15 +42,12 @@ export default function App() {
   useEffect(() => {
     window.onmessage = async (event: MessageEvent) => {
       const message = event.data.pluginMessage;
-      console.log("Received message:", message);
       switch (message.type) {
         case "figma-file-data": {
           setState(prevState => ({
             ...prevState,
             figmaFileData: message.data,
           }));
-          // 处理获取到的Figma文件数据
-          console.log("Figma file data:", message.data);
           break;
         }
         case "upload-image":
@@ -110,7 +107,6 @@ export default function App() {
           }
           break;
         case "export-nodes-result":
-          console.log("Exported nodes:", message.data);
           try {
             const zip = new JSZip();
             
@@ -131,7 +127,6 @@ export default function App() {
             // 添加图片文件
             if (message.data.images && message.data.images.length > 0) {
               message.data.images.forEach((imageData) => {
-                console.log("imageData:", imageData);
                 try {
                   // 从 base64 字符串中提取实际的 base64 数据
                   const base64Data = imageData.data.split(',')[1];
