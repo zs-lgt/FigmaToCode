@@ -14,6 +14,8 @@ import { htmlCodeGenTextStyles } from "backend/src/html/htmlMain";
 import { swiftUICodeGenTextStyles } from "backend/src/swiftui/swiftuiMain";
 import { exportNodes, getNodeExportImage } from 'backend/src/export';
 import { importFigmaJSON } from 'backend/src/importFigma';
+import { parseHtml, convertDocumentToFigma } from 'backend/src/htmlParser'
+import * as renderers from 'code-to-figma/src/renderers'
 
 let userPluginSettings: PluginSettings;
 let isCodeGenerationEnabled = true;  // 添加代码生成状态控制
@@ -262,9 +264,28 @@ const standardMode = async () => {
           }
         });
       });
-    }
-    if (msg.type === 'resize') {
+    } else if (msg.type === 'resize') {
       figma.ui.resize(msg.width, msg.height);
+    } else if (msg.type === 'import-html') {
+      const document = parseHtml(msg.html);
+      console.log('document', document)
+      if (document) {
+        const figmaNode = convertDocumentToFigma(document);
+        console.log('figma', figmaNode)
+        importFigmaJSON(figmaNode).then(() => {
+          // 发送成功消息
+          figma.ui.postMessage({
+            type: "success",
+            data: "Figma文件导入成功",
+          });
+        }).catch((error) => {
+          console.error('Error importing Figma JSON:', error);
+          figma.ui.postMessage({
+            type: "error",
+            data: `导入Figma文件失败: ${error.message}`,
+          });
+        });
+      }
     }
   });
 };

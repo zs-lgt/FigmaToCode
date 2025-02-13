@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { coldarkDark as theme } from "react-syntax-highlighter/dist/esm/styles/prism";
-import copy from "copy-to-clipboard"
-import classNames from "classnames";;
+import copy from "copy-to-clipboard";
+import classNames from "classnames";
 
 export type FrameworkTypes = "HTML" | "Tailwind" | "Flutter" | "SwiftUI";
 
@@ -46,6 +46,8 @@ export const PluginUI = (props: PluginUIProps) => {
   const [isResponsiveExpanded, setIsResponsiveExpanded] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [showJsonModal, setShowJsonModal] = useState(false);
+  const [showHtmlModal, setShowHtmlModal] = useState(false);
+  const [htmlContent, setHtmlContent] = useState('');
   const [enableCodeGen, setEnableCodeGen] = useState(true);
 
   useEffect(() => {
@@ -112,6 +114,10 @@ export const PluginUI = (props: PluginUIProps) => {
     );
   };
 
+  const handleImportHtml = () => {
+    setShowHtmlModal(true);
+  }
+
   const handleImportJson = () => {
     try {
       const jsonData = JSON.parse(jsonInput);
@@ -154,6 +160,25 @@ export const PluginUI = (props: PluginUIProps) => {
     }, '*');
   };
 
+  const handleConfirmHtmlModal = () => {
+    if (!htmlContent.trim()) return;
+                    
+    parent.postMessage({
+      pluginMessage: {
+        type: 'import-html',
+        html: htmlContent,
+      }
+    }, '*');
+                    
+    setShowHtmlModal(false);
+    setHtmlContent('');
+  };
+
+  const handleCancelHtmlModal = () => {
+    setShowHtmlModal(false);
+    setHtmlContent('');
+  };
+
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
@@ -187,12 +212,39 @@ export const PluginUI = (props: PluginUIProps) => {
           {enableCodeGen ? "关闭代码生成" : "开启代码生成"}
         </button>
         
-        {/* <button
+        <button
           className="px-3 py-1 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm"
-          onClick={handleFetchFigmaFile}
+          onClick={handleImportHtml}
         >
-          获取Figma文件
-        </button> */}
+          导入Html
+        </button>
+        {showHtmlModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+              <h2 className="text-lg font-semibold mb-4">输入HTML代码（支持HTML+TailwindCSS）</h2>
+              <textarea
+                className="w-full h-64 p-2 border border-gray-300 rounded-md mb-4 font-mono"
+                value={htmlContent}
+                onChange={(e) => setHtmlContent(e.target.value)}
+                placeholder="请输入HTML代码..."
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                  onClick={handleCancelHtmlModal}
+                >
+                  取消
+                </button>
+                <button
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-md"
+                  onClick={handleConfirmHtmlModal}
+                >
+                  确认
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <button
           onClick={() => setShowJsonModal(true)}
           className="px-3 py-1 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 rounded-md shadow-sm"

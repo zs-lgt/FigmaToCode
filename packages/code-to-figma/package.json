@@ -1,15 +1,11 @@
 {
-  "name": "react-figma",
+  "name": "code-to-figma",
   "version": "0.31.0",
   "description": "Render React components to Figma",
   "scripts": {
-    "tsc": "tsc -p tsconfig.json --noEmit",
     "test": "jest",
     "prettify": "prettier \"src/**/*.{js,jsx,ts,tsx}\" \"examples/**/*.{js,jsx,ts,tsx}\" --ignore-path ./.prettierignore --write",
-    "prettier:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx}\" \"examples/**/*.{js,jsx,ts,tsx}\"",
-    "build": "npm run build:clean && npm run build:lib",
-    "build:clean": "rimraf dist",
-    "build:lib": "cross-env BABEL_ENV=production tsc -p tsconfig.json"
+    "prettier:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx}\" \"examples/**/*.{js,jsx,ts,tsx}\""
   },
   "jest": {
     "preset": "ts-jest/presets/js-with-babel",

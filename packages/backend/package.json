@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@figma/plugin-typings": "^1.97.0",
+    "domhandler": "^5.0.3",
+    "htmlparser2": "^10.0.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
@@ -31,7 +33,7 @@
     "eslint-config-custom": "workspace:*",
     "tsconfig": "workspace:*",
     "tsup": "^8.2.2",
-    "typescript": "^5.5.4",
-    "types": "workspace:*"
+    "types": "workspace:*",
+    "typescript": "^5.5.4"
   }
 }
