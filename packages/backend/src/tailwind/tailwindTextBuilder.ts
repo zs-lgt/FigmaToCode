@@ -19,6 +19,7 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
     openTypeFeatures: { [key: string]: boolean };
   }[] {
     const segments = globalTextStyleSegments[id];
+
     if (!segments) {
       return [];
     }
@@ -36,7 +37,6 @@ export class TailwindTextBuilder extends TailwindDefaultBuilder {
         segment.fontSize,
       );
       // const textIndentStyle = this.indentStyle(segment.indentation);
-
       const styleClasses = [
         color,
         this.fontSize(segment.fontSize),

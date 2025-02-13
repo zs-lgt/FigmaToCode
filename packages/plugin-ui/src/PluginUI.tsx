@@ -44,8 +44,11 @@ type PluginUIProps = {
 
 export const PluginUI = (props: PluginUIProps) => {
   const [isResponsiveExpanded, setIsResponsiveExpanded] = useState(false);
-  const [jsonInput, setJsonInput] = useState('');
-  const [showJsonModal, setShowJsonModal] = useState(false);
+  const [uiJsonInput, setUiJsonInput] = useState('');
+  const [componentsJsonInput, setComponentsJsonInput] = useState('');
+  const [showUiJsonModal, setShowUiJsonModal] = useState(false);
+  const [showComponentsJsonModal, setShowComponentsJsonModal] = useState(false);
+  const [tempUiJson, setTempUiJson] = useState<any>(null);
   const [enableCodeGen, setEnableCodeGen] = useState(true);
 
   useEffect(() => {
@@ -112,19 +115,93 @@ export const PluginUI = (props: PluginUIProps) => {
     );
   };
 
-  const handleImportJson = () => {
+  const handleImportUiJson = () => {
     try {
-      const jsonData = JSON.parse(jsonInput);
+      const uiJsonData = JSON.parse(uiJsonInput);
+      // 保存nodesInfo部分
+      setTempUiJson(uiJsonData.nodesInfo || uiJsonData);
+      setShowUiJsonModal(false);
+      setShowComponentsJsonModal(true);
+      setUiJsonInput('');
+    } catch (error) {
+      console.error('UI JSON parsing error:', error);
+      alert('Invalid UI JSON format');
+    }
+  };
+
+  const handleImportComponentsJson = () => {
+    try {
+      if (!tempUiJson) {
+        throw new Error('UI JSON not found');
+      }
+      const componentsJsonData = JSON.parse(componentsJsonInput);
+      
+      // 深度合并UI JSON和Components JSON
+      const mergedData = mergeJsonData(tempUiJson, componentsJsonData);
+      
+      // 发送合并后的数据到插件
       window.parent.postMessage(
-        { pluginMessage: { type: "import-figma-json", data: jsonData } },
+        { 
+          pluginMessage: { 
+            type: "import-figma-json", 
+            data: mergedData
+          } 
+        },
         "*"
       );
-      setShowJsonModal(false);
-      setJsonInput('');
+      
+      setShowComponentsJsonModal(false);
+      setComponentsJsonInput('');
+      setTempUiJson(null);
     } catch (error) {
-      console.error('JSON parsing error:', error);
-      alert('Invalid JSON format');
+      console.error('Components JSON parsing error:', error);
+      alert('Invalid Components JSON format');
     }
+  };
+
+  // 合并UI JSON和Components JSON的函数
+  const mergeJsonData = (uiJson: any, componentsJson: any) => {
+    const mergeNode = (node: any) => {
+      // 如果是INSTANCE节点，合并组件信息
+      if (node.type === 'INSTANCE' && node.componentId) {
+        const componentInfo = componentsJson[node.componentId];
+        if (componentInfo) {
+          // 保留原始节点的所有属性，但使用组件的子节点
+          const mergedNode = {
+            ...componentInfo,  // 基础组件信息
+            ...node,          // 覆盖为原始节点的属性
+            type: 'INSTANCE', // 确保类型仍为INSTANCE
+            children: componentInfo.children?.map(child => {
+              // 递归处理子节点，保留其完整信息
+              return {
+                ...child,
+                // 如果子节点也是INSTANCE，递归处理
+                ...(child.type === 'INSTANCE' ? mergeNode(child) : {})
+              };
+            })
+          };
+          
+          return mergedNode;
+        }
+      }
+      
+      // 如果有子节点，递归处理
+      if (node.children) {
+        return {
+          ...node,
+          children: node.children.map(child => mergeNode(child))
+        };
+      }
+      
+      return node;
+    };
+
+    // 处理所有顶层节点
+    const result = Array.isArray(uiJson) 
+      ? uiJson.map(mergeNode)
+      : mergeNode(uiJson);
+
+    return result;
   };
 
   const handleExportNodesClick = () => {
@@ -149,7 +226,7 @@ export const PluginUI = (props: PluginUIProps) => {
     parent.postMessage({ 
       pluginMessage: { 
         type: 'export-selected-nodes',
-        optimize: true,
+        optimize: false,
       }
     }, '*');
   };
@@ -194,7 +271,7 @@ export const PluginUI = (props: PluginUIProps) => {
           获取Figma文件
         </button> */}
         <button
-          onClick={() => setShowJsonModal(true)}
+          onClick={() => setShowUiJsonModal(true)}
           className="px-3 py-1 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 rounded-md shadow-sm"
         >
           导入JSON
@@ -222,41 +299,91 @@ export const PluginUI = (props: PluginUIProps) => {
         </div>
       </div>
 
-      {/* JSON Import Modal */}
-      {showJsonModal && (
+      {/* UI JSON Import Modal */}
+      {showUiJsonModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setShowJsonModal(false)}></div>
+          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setShowUiJsonModal(false)}></div>
           <div className="relative bg-white dark:bg-neutral-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">导入 Figma JSON</h3>
+              <h3 className="text-lg font-semibold">第一步：导入 UI JSON</h3>
               <button
                 className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-white"
-                onClick={() => setShowJsonModal(false)}
+                onClick={() => setShowUiJsonModal(false)}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+              请先粘贴包含UI结构的JSON数据（ui.json）
+            </p>
             <textarea
               className="w-full h-64 p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={jsonInput}
-              onChange={(e) => setJsonInput(e.target.value)}
-              placeholder="粘贴 Figma JSON 数据..."
+              value={uiJsonInput}
+              onChange={(e) => setUiJsonInput(e.target.value)}
+              placeholder="粘贴 ui.json 数据..."
             />
             <div className="flex justify-end gap-2 mt-4">
               <button
                 className="px-4 py-2 text-sm font-semibold text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white transition-colors"
                 onClick={() => {
-                  setShowJsonModal(false);
-                  setJsonInput('');
+                  setShowUiJsonModal(false);
+                  setUiJsonInput('');
                 }}
               >
                 取消
               </button>
               <button
                 className="px-4 py-2 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors"
-                onClick={handleImportJson}
+                onClick={handleImportUiJson}
+              >
+                下一步
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Components JSON Import Modal */}
+      {showComponentsJsonModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setShowComponentsJsonModal(false)}></div>
+          <div className="relative bg-white dark:bg-neutral-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">第二步：导入组件 JSON</h3>
+              <button
+                className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-white"
+                onClick={() => setShowComponentsJsonModal(false)}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+              请粘贴包含组件信息的JSON数据（components.json）
+            </p>
+            <textarea
+              className="w-full h-64 p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={componentsJsonInput}
+              onChange={(e) => setComponentsJsonInput(e.target.value)}
+              placeholder="粘贴 components.json 数据..."
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                className="px-4 py-2 text-sm font-semibold text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white transition-colors"
+                onClick={() => {
+                  setShowComponentsJsonModal(false);
+                  setComponentsJsonInput('');
+                  setTempUiJson(null);
+                }}
+              >
+                取消
+              </button>
+              <button
+                className="px-4 py-2 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors"
+                onClick={handleImportComponentsJson}
               >
                 导入
               </button>

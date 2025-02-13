@@ -4,8 +4,51 @@ import { BaseNodeCreator } from '../nodeFactory/baseNodeCreator'
 // Main function to import nodes
 export async function importNode(data: any, parent: BaseNode & ChildrenMixin, parentBounds?: { x: number, y: number }): Promise<SceneNode | null> {
   try {
-    const factory = new NodeFactory();
-    const node = await factory.createNode(data.type, data);
+    let node: SceneNode | null = null;
+
+    // 特殊处理INSTANCE节点
+    if (data.type === 'INSTANCE') {
+      if (data.componentKey) {
+        try {
+          // 通过componentKey导入组件
+          const component = await figma.importComponentByKeyAsync(data.componentKey);
+          if (component) {
+            // 创建实例
+            node = component.createInstance();
+            // 保持原有的x和y属性
+            if (data.x !== undefined) node.x = data.x;
+            if (data.y !== undefined) node.y = data.y;
+          }
+        } catch (error) {
+          // 兜底方案：本地组件放本地
+          try {
+            const instance : InstanceNode = figma.getNodeById(data.id);
+            const component = await instance?.getMainComponentAsync();
+            
+            if (component) {
+              // 创建实例
+              node = component.createInstance();
+              // 保持原有的x和y属性
+              if (data.x !== undefined) node.x = data.x;
+              if (data.y !== undefined) node.y = data.y;
+            }
+          } catch (error) {
+            console.log(error);
+          }
+          console.warn(`Failed to import component by key: ${data.componentKey}`, error);
+        }
+      }
+      
+      // 如果没有componentKey或导入失败，使用原来的逻辑
+      if (!node) {
+        const factory = new NodeFactory();
+        node = await factory.createNode(data.type, data);
+      }
+    } else {
+      // 其他类型节点使用原来的逻辑
+      const factory = new NodeFactory();
+      node = await factory.createNode(data.type, data);
+    }
     
     if (!node) {
       console.warn(`Failed to create node of type: ${data.type}`);

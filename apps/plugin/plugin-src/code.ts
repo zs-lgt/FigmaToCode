@@ -206,15 +206,12 @@ const standardMode = async () => {
         });
       });
     } else if (msg.type === 'export-nodes') {
-      console.log(msg);
       const nodes = figma.currentPage.children;
       exportNodes(nodes, msg.optimize).then(async nodesData => {
-        const { nodesInfo, description, images, optimize } = nodesData;
+        const { nodesInfo, description, components, images, optimize } = nodesData;
         const imagesData = [];
         for (const imageId of images) {
           const imageBase64 = await getNodeExportImage(imageId.id);
-          console.log("imageBase64", imageBase64);
-          
           if (imageBase64) {
             if (imageBase64) {
               imagesData.push({
@@ -229,6 +226,7 @@ const standardMode = async () => {
           type: "export-nodes-result",
           data: {
             nodesInfo: JSON.stringify(nodesInfo, null, 2),
+            components: JSON.stringify(components, null, 2),
             description,
             images: imagesData,
             optimize,

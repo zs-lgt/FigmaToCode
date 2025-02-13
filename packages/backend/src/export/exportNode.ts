@@ -115,6 +115,20 @@ export const getNodeInfo = (node: SceneNode) => {
 
   // 处理特定类型的节点属性
   if (node.type === 'FRAME' || node.type === 'GROUP' || node.type === 'INSTANCE') {
+    // 如果是组件实例，获取实例(变体)属性
+    if (node.type === 'INSTANCE') {
+      const instanceNode = node as InstanceNode;
+      if ('componentProperties' in instanceNode && 
+          instanceNode.componentProperties && 
+          Object.keys(instanceNode.componentProperties).length > 0) {
+        nodeInfo.componentProperties = instanceNode.componentProperties;
+      }
+      if ('componentId' in instanceNode && 
+          instanceNode.componentId && 
+          instanceNode.componentId !== '') {
+        nodeInfo.componentId = instanceNode.componentId;
+      }
+    }
     const frameNode = node as FrameNode;
     nodeInfo.layoutMode = frameNode.layoutMode;
     nodeInfo.primaryAxisSizingMode = frameNode.primaryAxisSizingMode;
@@ -227,7 +241,6 @@ export const getNodeExportImage = async (nodeId: string) => {
     // 使用节点的导出设置导出图片
     // @ts-ignore
     const settings = node.exportSettings[0];
-    console.log("[getNodeExportImage] settings:", settings);
     
     // @ts-ignore
     const bytes = await node.exportAsync({
