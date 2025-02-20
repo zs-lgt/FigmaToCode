@@ -45,10 +45,7 @@ type PluginUIProps = {
 export const PluginUI = (props: PluginUIProps) => {
   const [isResponsiveExpanded, setIsResponsiveExpanded] = useState(false);
   const [uiJsonInput, setUiJsonInput] = useState('');
-  const [componentsJsonInput, setComponentsJsonInput] = useState('');
   const [showUiJsonModal, setShowUiJsonModal] = useState(false);
-  const [showComponentsJsonModal, setShowComponentsJsonModal] = useState(false);
-  const [tempUiJson, setTempUiJson] = useState<any>(null);
   const [enableCodeGen, setEnableCodeGen] = useState(true);
 
   useEffect(() => {
@@ -118,90 +115,25 @@ export const PluginUI = (props: PluginUIProps) => {
   const handleImportUiJson = () => {
     try {
       const uiJsonData = JSON.parse(uiJsonInput);
-      // 保存nodesInfo部分
-      setTempUiJson(uiJsonData.nodesInfo || uiJsonData);
-      setShowUiJsonModal(false);
-      setShowComponentsJsonModal(true);
-      setUiJsonInput('');
-    } catch (error) {
-      console.error('UI JSON parsing error:', error);
-      alert('Invalid UI JSON format');
-    }
-  };
-
-  const handleImportComponentsJson = () => {
-    try {
-      if (!tempUiJson) {
-        throw new Error('UI JSON not found');
-      }
-      const componentsJsonData = JSON.parse(componentsJsonInput);
+      const data = uiJsonData.nodesInfo || uiJsonData;
       
-      // 深度合并UI JSON和Components JSON
-      const mergedData = mergeJsonData(tempUiJson, componentsJsonData);
-      
-      // 发送合并后的数据到插件
+      // 直接发送数据到插件
       window.parent.postMessage(
         { 
           pluginMessage: { 
             type: "import-figma-json", 
-            data: mergedData
+            data: data
           } 
         },
         "*"
       );
       
-      setShowComponentsJsonModal(false);
-      setComponentsJsonInput('');
-      setTempUiJson(null);
+      setShowUiJsonModal(false);
+      setUiJsonInput('');
     } catch (error) {
-      console.error('Components JSON parsing error:', error);
-      alert('Invalid Components JSON format');
+      console.error('UI JSON parsing error:', error);
+      alert('Invalid UI JSON format');
     }
-  };
-
-  // 合并UI JSON和Components JSON的函数
-  const mergeJsonData = (uiJson: any, componentsJson: any) => {
-    const mergeNode = (node: any) => {
-      // 如果是INSTANCE节点，合并组件信息
-      if (node.type === 'INSTANCE' && node.componentId) {
-        const componentInfo = componentsJson[node.componentId];
-        if (componentInfo) {
-          // 保留原始节点的所有属性，但使用组件的子节点
-          const mergedNode = {
-            ...componentInfo,  // 基础组件信息
-            ...node,          // 覆盖为原始节点的属性
-            type: 'INSTANCE', // 确保类型仍为INSTANCE
-            children: componentInfo.children?.map(child => {
-              // 递归处理子节点，保留其完整信息
-              return {
-                ...child,
-                // 如果子节点也是INSTANCE，递归处理
-                ...(child.type === 'INSTANCE' ? mergeNode(child) : {})
-              };
-            })
-          };
-          
-          return mergedNode;
-        }
-      }
-      
-      // 如果有子节点，递归处理
-      if (node.children) {
-        return {
-          ...node,
-          children: node.children.map(child => mergeNode(child))
-        };
-      }
-      
-      return node;
-    };
-
-    // 处理所有顶层节点
-    const result = Array.isArray(uiJson) 
-      ? uiJson.map(mergeNode)
-      : mergeNode(uiJson);
-
-    return result;
   };
 
   const handleExportNodesClick = () => {
@@ -264,12 +196,6 @@ export const PluginUI = (props: PluginUIProps) => {
           {enableCodeGen ? "关闭代码生成" : "开启代码生成"}
         </button>
         
-        {/* <button
-          className="px-3 py-1 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md shadow-sm"
-          onClick={handleFetchFigmaFile}
-        >
-          获取Figma文件
-        </button> */}
         <button
           onClick={() => setShowUiJsonModal(true)}
           className="px-3 py-1 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 rounded-md shadow-sm"
@@ -305,7 +231,7 @@ export const PluginUI = (props: PluginUIProps) => {
           <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setShowUiJsonModal(false)}></div>
           <div className="relative bg-white dark:bg-neutral-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">第一步：导入 UI JSON</h3>
+              <h3 className="text-lg font-semibold">导入 JSON</h3>
               <button
                 className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-white"
                 onClick={() => setShowUiJsonModal(false)}
@@ -316,13 +242,13 @@ export const PluginUI = (props: PluginUIProps) => {
               </button>
             </div>
             <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-              请先粘贴包含UI结构的JSON数据（ui.json）
+              请粘贴包含UI结构的JSON数据
             </p>
             <textarea
               className="w-full h-64 p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={uiJsonInput}
               onChange={(e) => setUiJsonInput(e.target.value)}
-              placeholder="粘贴 ui.json 数据..."
+              placeholder="粘贴 JSON 数据..."
             />
             <div className="flex justify-end gap-2 mt-4">
               <button
@@ -337,53 +263,6 @@ export const PluginUI = (props: PluginUIProps) => {
               <button
                 className="px-4 py-2 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors"
                 onClick={handleImportUiJson}
-              >
-                下一步
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Components JSON Import Modal */}
-      {showComponentsJsonModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
-          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setShowComponentsJsonModal(false)}></div>
-          <div className="relative bg-white dark:bg-neutral-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">第二步：导入组件 JSON</h3>
-              <button
-                className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-white"
-                onClick={() => setShowComponentsJsonModal(false)}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-              请粘贴包含组件信息的JSON数据（components.json）
-            </p>
-            <textarea
-              className="w-full h-64 p-2 border rounded-md dark:bg-neutral-700 dark:border-neutral-600 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={componentsJsonInput}
-              onChange={(e) => setComponentsJsonInput(e.target.value)}
-              placeholder="粘贴 components.json 数据..."
-            />
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                className="px-4 py-2 text-sm font-semibold text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white transition-colors"
-                onClick={() => {
-                  setShowComponentsJsonModal(false);
-                  setComponentsJsonInput('');
-                  setTempUiJson(null);
-                }}
-              >
-                取消
-              </button>
-              <button
-                className="px-4 py-2 text-sm font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-md transition-colors"
-                onClick={handleImportComponentsJson}
               >
                 导入
               </button>
@@ -481,27 +360,6 @@ export const ResponsiveGrade = () => {
 };
 
 type LocalCodegenPreference =
-  // | {
-  //     itemType: "alternative-unit";
-  //     defaultScaleFactor: number;
-  //     scaledUnit: string;
-  //     default?: boolean;
-  //     includedLanguages?: FrameworkTypes[];
-  //   }
-  // | {
-  //     itemType: "select";
-  //     propertyName: Exclude<keyof PluginSettings, "framework">;
-  //     label: string;
-  //     options: { label: string; value: string; isDefault?: boolean }[];
-  //     includedLanguages?: FrameworkTypes[];
-  //   }
-  // | {
-  //     itemType: "action";
-  //     propertyName: string;
-  //     label: string;
-  //     includedLanguages?: FrameworkTypes[];
-  //   }
-  // |
   {
     itemType: "individual_select";
     propertyName: Exclude<
@@ -524,21 +382,6 @@ export const preferenceOptions: LocalCodegenPreference[] = [
     isDefault: true,
     includedLanguages: ["HTML", "Tailwind"],
   },
-  // {
-  //   itemType: "individual_select",
-  //   propertyName: "inlineStyle",
-  //   label: "内联样式",
-  //   description: 'Inline style',
-  //   isDefault: false,
-  //   includedLanguages: ["HTML"],
-  // },
-  // {
-  //   itemType: "individual_select",
-  //   propertyName: "responsiveRoot",
-  //   label: "Responsive Root",
-  //   isDefault: false,
-  //   includedLanguages: ["Tailwind"],
-  // },
   {
     itemType: "individual_select",
     propertyName: "optimizeLayout",
@@ -547,38 +390,6 @@ export const preferenceOptions: LocalCodegenPreference[] = [
     isDefault: false,
     includedLanguages: ["HTML", "Tailwind", "Flutter", "SwiftUI"],
   },
-  // {
-  //   itemType: "individual_select",
-  //   propertyName: "layerName",
-  //   label: "Layer names",
-  //   description: 'Include layer names in classes',
-  //   isDefault: false,
-  //   includedLanguages: ["HTML", "Tailwind"],
-  // },
-  // {
-  //   itemType: "individual_select",
-  //   propertyName: "roundTailwindValues",
-  //   label: "Round values",
-  //   description: 'Round pixel values to nearest Tailwind sizes',
-  //   isDefault: false,
-  //   includedLanguages: ["Tailwind"],
-  // },
-  // {
-  //   itemType: "individual_select",
-  //   propertyName: "roundTailwindColors",
-  //   label: "Round colors",
-  //   description: 'Round color values to nearest Tailwind colors',
-  //   isDefault: false,
-  //   includedLanguages: ["Tailwind"],
-  // },
-  // {
-  //   itemType: "individual_select",
-  //   propertyName: "customTailwindColors",
-  //   label: "Custom colors",
-  //   description: 'Use color variable names as custom color names',
-  //   isDefault: false,
-  //   includedLanguages: ["Tailwind"],
-  // },
   {
     itemType: "individual_select",
     propertyName: "customTailwindColors",
@@ -587,7 +398,6 @@ export const preferenceOptions: LocalCodegenPreference[] = [
     isDefault: false,
     includedLanguages: ["HTML", "Tailwind"],
   }
-  // Add your preferences data here
 ];
 
 const selectPreferenceOptions: {
@@ -619,16 +429,6 @@ const selectPreferenceOptions: {
     ],
     includedLanguages: ["SwiftUI"],
   },
-  // {
-  //   itemType: "select",
-  //   propertyName: "htmlGenerationMode",
-  //   label: "Mode",
-  //   options: [
-  //     { label: "Component", value: "component" },
-  //     { label: "Snippet", value: "snippet" },
-  //   ],
-  //   includedLanguages: ["HTML"],
-  // },
 ];
 
 export const CodePanel = (props: {
@@ -870,61 +670,6 @@ export const GradientsPanel = (props: {
     </div>
   );
 };
-
-// export const PrevColorsPanel = (props: {
-//   colors: {
-//     hex: string;
-//     colorName: string;
-//     exportValue: string;
-//     contrastWhite: number;
-//     contrastBlack: number;
-//   }[];
-//   // onColorClick: (color: string) => void;
-// }) => {
-//   return (
-//     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
-//       <div className="container mx-auto p-4">
-//         <div className="flex flex-wrap items-start space-x-2 lg:space-x-0">
-//           <div className="flex-1 min-w-0">
-//             <h2 className="text-gray-800 dark:text-gray-200 mb-2">Text</h2>
-//             {["Button1", "Button2", "Button3"].map((button, idx) => (
-//               <button
-//                 key={idx}
-//                 className="bg-white dark:bg-gray-800 p-2 mb-1 rounded-lg focus:outline-none focus:ring-0 hover:bg-gray-200 dark:hover:bg-gray-700 w-full transition"
-//               >
-//                 <div className="flex flex-col">
-//                   <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-//                     Tt
-//                   </span>
-//                   <span className="text-xs text-gray-500 dark:text-gray-400">
-//                     {button}
-//                   </span>
-//                 </div>
-//               </button>
-//             ))}
-//           </div>
-//           <div className="flex-1 lg:max-w-[200px]">
-//             <h2 className="text-gray-800 dark:text-gray-200 mb-2">Colors</h2>
-//             <div className="flex flex-wrap">
-//               {["red-500", "yellow-500", "blue-500"].map((color, idx) => (
-//                 <button
-//                   key={idx}
-//                   className={`bg-${color} w-full sm:w-1/2 lg:w-full h-16 mb-1 rounded-lg focus:outline-none focus:ring-0 transition`}
-//                 >
-//                   <div className="flex flex-col h-full justify-center items-center">
-//                     <span className="text-xs font-semibold text-white">
-//                       Color{idx + 1}
-//                     </span>
-//                   </div>
-//                 </button>
-//               ))}
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
 
 type SelectableToggleProps = {
   onSelect: (isSelected: boolean) => void;

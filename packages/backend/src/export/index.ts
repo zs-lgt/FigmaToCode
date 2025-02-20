@@ -9,22 +9,10 @@ import {
 export { getNodeExportImage };
 
 // 递归处理节点及其子节点
-const processNode = async (node: SceneNode, components: { [key: string]: any }) => {
-  // 如果是INSTANCE节点，将其存入components
+const processNode = async (node: SceneNode) => {
+  // 如果是INSTANCE节点，返回简化信息
   if (node.type === 'INSTANCE') {
     const instanceNode = node as InstanceNode;
-    // 如果这个组件还没有被存储
-    // 存储完整的节点信息，包括子节点
-    if (!components[instanceNode.name]) {
-      const fullNodeInfo = getNodeInfo(instanceNode);
-      if ('children' in instanceNode && instanceNode.children) {
-        fullNodeInfo.children = instanceNode.children.map(child => 
-          getNodeInfo(child)
-        );
-      }
-      components[instanceNode.name] = fullNodeInfo;
-    }
-
     // 获取主组件信息
     const mainComponent = await instanceNode.getMainComponentAsync();
     const key = mainComponent?.key || null;
@@ -36,7 +24,9 @@ const processNode = async (node: SceneNode, components: { [key: string]: any }) 
       type: 'INSTANCE',
       x: instanceNode.x,
       y: instanceNode.y,
-      componentProperties: instanceNode.componentProperties || {}
+      componentProperties: instanceNode.componentProperties || {},
+      width: instanceNode.width,
+      height: instanceNode.height
     };
   }
 
@@ -45,7 +35,7 @@ const processNode = async (node: SceneNode, components: { [key: string]: any }) 
     const processedNode = getNodeInfo(node);
     // 等待所有子节点处理完成
     processedNode.children = await Promise.all(
-      node.children.map(child => processNode(child, components))
+      node.children.map(child => processNode(child))
     );
     return processedNode;
   }
@@ -56,7 +46,6 @@ const processNode = async (node: SceneNode, components: { [key: string]: any }) 
 
 export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean, filterSymbols: boolean = true) => {
   let description = '';
-  const components: { [key: string]: any } = {};
   const exportedNodes = [];
   const exportedImages = [];
 
@@ -75,7 +64,7 @@ export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean
       }
 
       // 处理节点及其子节点
-      const processedNode = await processNode(node, components);
+      const processedNode = await processNode(node);
       if (processedNode) {
         exportedNodes.push(optimize ? cleanExportData(processedNode) : processedNode);
         exportedImages.push({
@@ -90,7 +79,6 @@ export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean
 
   return {
     nodesInfo: exportedNodes,
-    components,
     description,
     images: exportedImages,
     optimize,

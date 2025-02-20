@@ -208,25 +208,24 @@ const standardMode = async () => {
     } else if (msg.type === 'export-nodes') {
       const nodes = figma.currentPage.children;
       exportNodes(nodes, msg.optimize).then(async nodesData => {
-        const { nodesInfo, description, components, images, optimize } = nodesData;
+        const { nodesInfo, description, images, optimize } = nodesData;
         const imagesData = [];
         for (const imageId of images) {
           const imageBase64 = await getNodeExportImage(imageId.id);
           if (imageBase64) {
-            if (imageBase64) {
-              imagesData.push({
-                name: imageId.name,
-                data: imageBase64
-              });
-            }
+            imagesData.push({
+              id: imageId.id,
+              name: imageId.name,
+              base64: imageBase64
+            });
           }
         }
-        // 发送所有数据
+
+        // 发送导出结果到UI
         figma.ui.postMessage({
           type: "export-nodes-result",
           data: {
             nodesInfo: JSON.stringify(nodesInfo, null, 2),
-            components: JSON.stringify(components, null, 2),
             description,
             images: imagesData,
             optimize,
@@ -241,12 +240,11 @@ const standardMode = async () => {
         for (const imageId of images) {
           const imageBase64 = getNodeExportImage(imageId.id);
           if (imageBase64) {
-            if (imageBase64) {
-              imagesData.push({
-                name: imageId.name,
-                data: imageBase64
-              });
-            }
+            imagesData.push({
+              id: imageId.id,
+              name: imageId.name,
+              base64: imageBase64
+            });
           }
         }
         // 发送所有数据

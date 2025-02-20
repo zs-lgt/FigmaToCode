@@ -114,10 +114,6 @@ export default function App() {
             if (message.data.nodesInfo) {
               zip.file("ui.json", message.data.nodesInfo);
             }
-
-            if (message.data.components) {
-              zip.file("components.json", message.data.components);
-            }
             
             // 添加描述信息文件
             if (message.data.description) {
