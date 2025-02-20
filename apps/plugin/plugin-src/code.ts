@@ -39,6 +39,25 @@ function isKeyOfPluginSettings(key: string): key is keyof PluginSettings {
   return key in defaultPluginSettings;
 }
 
+const traverseFigmaNode = (
+  node: any,
+  callback: { 
+    onInit?: (node: any, parent?: SceneNode) => SceneNode,
+    onChild?: (node: any, parent?: SceneNode) => SceneNode,
+   },
+  parent?: any
+) => {
+  if (!node) return;
+  callback.onInit && callback?.onInit(node, parent);
+  const children = node.children || [];
+  // 翻转遍历
+  children.reverse().forEach((child: any) => {
+    let newParent;
+    if (callback.onChild) newParent = callback.onChild(child, parent);
+    traverseFigmaNode(child, callback, newParent);
+  })
+}
+
 const getUserSettings = async () => {
   const possiblePluginSrcSettings =
     (await figma.clientStorage.getAsync("userPluginSettings")) ?? {};
@@ -271,6 +290,18 @@ const standardMode = async () => {
       console.log('document', document)
       if (document) {
         const figmaNode = convertDocumentToFigma(document);
+
+        // 实现遍历figmaNode节点树
+        // traverseFigmaNode(figmaNode, {
+        //   onChild: (nodeJson, parent) => {
+        //     console.log('nodeJson', nodeJson)
+        //     console.log('parent', parent)
+        //     const node = renderers[nodeJson.type]()(nodeJson)
+        //     parent && parent?.appendChild(node)
+        //     return node
+        //   }
+        // }, figma.currentPage)
+
         console.log('figma', figmaNode)
         importFigmaJSON(figmaNode).then(() => {
           // 发送成功消息

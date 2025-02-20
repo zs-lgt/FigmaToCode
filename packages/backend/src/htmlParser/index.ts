@@ -39,6 +39,15 @@ const convertTailwindColorToFigma = (color: string): Paint | null => {
   }
   return null;
 };
+
+const parseNumber = (value: string): number => {
+  if (value.endsWith('px]')) {
+    return Number(value.replace('px]', '').replace('[', ''))
+  } else {
+    return parseInt(value) * 4
+  }
+}
+
 interface FigmaNodeProperties {
   type: string;
   name?: string;
@@ -89,7 +98,9 @@ const cleanNode = (node: any): void => {
 
 export const parseHtml = (html: string): Document | undefined => {
   const cleanedHtml = cleanHtmlContent(html);
-  const doc = HtmlParser.parseDocument(cleanedHtml);
+  const doc = HtmlParser.parseDocument(cleanedHtml, {
+    recognizeSelfClosing: true
+  });
   
   // Clean the document tree
   if (doc.children) {
@@ -137,21 +148,27 @@ const convertTailwindClassesToFigmaProps = (classes: string[]): Partial<FigmaNod
     
     // Padding
     else if (cls.startsWith('p-')) {
-      const value = parseInt(cls.slice(2)) * 4;
-      props.paddingLeft = value;
-      props.paddingRight = value;
-      props.paddingTop = value;
-      props.paddingBottom = value;
+      const value = cls.slice(2);
+      props.paddingLeft = parseNumber(value);
+      props.paddingRight = parseNumber(value);
+      props.paddingTop = parseNumber(value);
+      props.paddingBottom = parseNumber(value);
     } else if (cls.startsWith('px-')) {
-      const value = parseInt(cls.slice(3)) * 4;
-      props.paddingLeft = value;
-      props.paddingRight = value;
+      const value = cls.slice(3);
+      props.paddingLeft = parseNumber(value);
+      props.paddingRight = parseNumber(value);
     } else if (cls.startsWith('py-')) {
-      const value = parseInt(cls.slice(3)) * 4;
-      props.paddingTop = value;
-      props.paddingBottom = value;
+      const value = cls.slice(3);
+      props.paddingTop = parseNumber(value);
+      props.paddingBottom = parseNumber(value);
+    } else if (cls.startsWith('pt-')) {
+      const value = cls.slice(3);
+      props.paddingTop = parseNumber(value);
+    } else if (cls.startsWith('pb-')) {
+      const value = cls.slice(3);
+      props.paddingBottom = parseNumber(value);
     }
-    
+
     // Gap
     else if (cls.startsWith('gap-')) {
       props.itemSpacing = parseInt(cls.slice(4)) * 4;
@@ -177,8 +194,8 @@ const convertTailwindClassesToFigmaProps = (classes: string[]): Partial<FigmaNod
         props.height = 900; // Default screen height
       } else if (value === 'auto') {
         props.height = 'AUTO'; // Auto height
-      } else if (value.endsWith('px')) {
-        props.height = parseInt(value);
+      } else if (value.endsWith('px]')) {
+        props.height = Number(value.replace('px]', '').replace('[', ''));
       } else if (value.endsWith('%')) {
         // Convert percentage to pixels (assuming container width of 1000px)
         props.height = Math.floor(parseInt(value) * 10);
@@ -200,8 +217,8 @@ const convertTailwindClassesToFigmaProps = (classes: string[]): Partial<FigmaNod
         props.width = 1200; // Default screen width
       } else if (value === 'auto') {
         props.width = 'AUTO'; // Auto width
-      } else if (value.endsWith('px')) {
-        props.width = parseInt(value);
+      } else if (value.endsWith('px]')) {
+        props.width = Number(value.replace('px]', '').replace('[', ''));
       } else if (value.endsWith('%')) {
         // Convert percentage to pixels (assuming container width of 1000px)
         props.width = Math.floor(parseInt(value) * 10);
@@ -399,7 +416,7 @@ const convertTailwindClassesToFigmaProps = (classes: string[]): Partial<FigmaNod
 const convertElementToFigma = (element: Element): SceneNode => {
   const name = element.attribs['data-node-name']
   const type = element.attribs['data-node-type']
-  const classes = (element.attribs?.class || '').split(' ').filter(Boolean);
+  const classes = (element.attribs?.classname || '').split(' ').filter(Boolean);
   const figmaProps = convertTailwindClassesToFigmaProps(classes);
   let children: SceneNode[] = [];
 
@@ -410,6 +427,7 @@ const convertElementToFigma = (element: Element): SceneNode => {
       }
       return null;
     }).filter(child => child !== null) as SceneNode[];
+    console.log('children', children)
   }
 
   // Handle text elements
@@ -437,24 +455,26 @@ const convertElementToFigma = (element: Element): SceneNode => {
   }
 
   // Create frame node
-  const frameNode: Partial<FrameNode> = {
+  const node: Partial<FrameNode> = {
     type: 'FRAME',
     name: name || element.tagName || 'Frame',
-    children: children,
+    children,
     ...figmaProps
   };
 
+  if (type) {
+    node.type = type;
+  }
   // Set default layout properties if not specified
-  if (!frameNode.layoutMode) {
-    frameNode.layoutMode = 'VERTICAL';
-    frameNode.primaryAxisSizingMode = 'AUTO';
-    frameNode.counterAxisSizingMode = 'AUTO';
-    frameNode.primaryAxisAlignItems = 'MIN';
-    frameNode.counterAxisAlignItems = 'MIN';
+  if (!node.layoutMode) {
+    node.layoutMode = 'HORIZONTAL';
+    node.primaryAxisSizingMode = 'AUTO';
+    node.counterAxisSizingMode = 'AUTO';
+    node.primaryAxisAlignItems = 'MIN';
+    node.counterAxisAlignItems = 'MIN';
   }
 
-
-  return frameNode as FrameNode;
+  return node as SceneNode;
 };
 
 export const convertDocumentToFigma = (document: Document): SceneNode => {
