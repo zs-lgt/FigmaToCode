@@ -6,18 +6,21 @@ export class TextNodeCreator extends BaseNodeCreator {
     this.setBaseProperties(node, data);
     
     try {
-      // 加载字体
+      // 1. First load the default Inter font
+      await figma.loadFontAsync({ family: "Inter", style: "Regular" });
+      
+      // 2. 加载自定义字体
       const loadedFont = await this.loadFont(data);
       
-      // 写入文本
+      // 3. 写入文本（现在可以安全地写入，因为默认字体已加载）
       if (data.characters) {
         node.characters = data.characters;
       }
       
-      // 导入文本样式
+      // 4. 导入文本样式
       await this.applyTextStyles(node, data);
       
-      // 导入背景、边框等容器样式
+      // 5. 导入背景、边框等容器样式
       this.setAppearance(node, data);
       
       return node;
