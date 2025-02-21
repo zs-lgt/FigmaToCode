@@ -161,6 +161,7 @@ export class BaseNodeCreator implements NodeCreator {
         case 'SOLID':
           return {
             type: 'SOLID',
+            visible: fill.visible !== undefined ? fill.visible : true,
             color: {
               r: fill.color.r || 0,
               g: fill.color.g || 0,
@@ -176,6 +177,7 @@ export class BaseNodeCreator implements NodeCreator {
         case 'GRADIENT_DIAMOND':
           return {
             type: fill.type,
+            visible: fill.visible !== undefined ? fill.visible : true,
             gradientStops: fill.gradientStops.map((stop: any) => ({
               color: {
                 r: stop.color.r || 0,
@@ -193,6 +195,7 @@ export class BaseNodeCreator implements NodeCreator {
         case 'IMAGE':
           return {
             type: 'IMAGE',
+            visible: fill.visible !== undefined ? fill.visible : true,
             imageHash: fill.imageHash || '',
             scaleMode: fill.scaleMode || 'FILL',
             opacity: fill.opacity !== undefined ? fill.opacity : 1,
