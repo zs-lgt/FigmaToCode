@@ -25,9 +25,20 @@ export class BaseNodeCreator implements NodeCreator {
     let x = 0;
     let y = 0;
 
-    // Get size from data
-    width = Math.max(1, Math.abs(data.width || data.size?.width || width));
-    height = Math.max(1, Math.abs(data.height || data.size?.height || height));
+    // Get size from data, respecting layoutSizing
+    if (data.layoutSizingHorizontal === 'HUG' && (node.type === 'FRAME' || node.type === 'TEXT')) {
+      // Don't set width for HUG
+      width = node.width;
+    } else {
+      width = Math.max(1, Math.abs(data.width || data.size?.width || width));
+    }
+
+    if (data.layoutSizingVertical === 'HUG' && (node.type === 'FRAME' || node.type === 'TEXT')) {
+      // Don't set height for HUG
+      height = node.height;
+    } else {
+      height = Math.max(1, Math.abs(data.height || data.size?.height || height));
+    }
 
     // For INSTANCE nodes and their children, always use their own x,y coordinates
     if (data.type === 'INSTANCE' || (parentBounds && data.id?.includes(';'))) {
@@ -41,10 +52,14 @@ export class BaseNodeCreator implements NodeCreator {
       y = data.relativeTransform[1][2];
     }
 
-    // Apply size if supported
+    // Apply size if supported and not HUG
     if ('resize' in node) {
       try {
-        node.resize(width, height);
+        // Only resize if either dimension is not HUG
+        if (data.layoutSizingHorizontal !== 'HUG' || data.layoutSizingVertical !== 'HUG' || 
+            (node.type !== 'FRAME' && node.type !== 'TEXT')) {
+          node.resize(width, height);
+        }
       } catch (error) {
         console.warn(`Failed to resize ${node.name}:`, error);
       }
