@@ -134,6 +134,19 @@ export async function importFigmaJSON(jsonData: any): Promise<void> {
     const containerFrame = figma.createFrame();
     containerFrame.name = jsonData.name || 'Imported Design';
     
+    // Set auto layout properties
+    containerFrame.layoutMode = 'VERTICAL';
+    containerFrame.primaryAxisSizingMode = 'AUTO';
+    containerFrame.counterAxisSizingMode = 'AUTO';
+    containerFrame.layoutAlign = 'STRETCH';
+    containerFrame.primaryAxisAlignItems = 'MIN';
+    containerFrame.counterAxisAlignItems = 'MIN';
+    containerFrame.itemSpacing = 0;
+    containerFrame.paddingLeft = 0;
+    containerFrame.paddingRight = 0;
+    containerFrame.paddingTop = 0;
+    containerFrame.paddingBottom = 0;
+
     // Find the bounds of the content
     let minX = Infinity;
     let minY = Infinity;

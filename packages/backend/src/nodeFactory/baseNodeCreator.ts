@@ -17,6 +17,11 @@ export class BaseNodeCreator implements NodeCreator {
     if (data.visible !== undefined) node.visible = data.visible;
     if (data.locked !== undefined) node.locked = data.locked;
     if (data.opacity !== undefined) node.opacity = data.opacity;
+    
+    // Set layout align
+    if ('layoutAlign' in node && data.layoutAlign) {
+      node.layoutAlign = data.layoutAlign;
+    }
   }
 
   setGeometry(node: SceneNode, data: any, parentBounds?: { x: number, y: number }): { x: number, y: number } {
@@ -26,14 +31,14 @@ export class BaseNodeCreator implements NodeCreator {
     let y = 0;
 
     // Get size from data, respecting layoutSizing
-    if (data.layoutSizingHorizontal === 'HUG' && (node.type === 'FRAME' || node.type === 'TEXT')) {
+    if (data.layoutSizingHorizontal === 'HUG') {
       // Don't set width for HUG
       width = node.width;
     } else {
       width = Math.max(1, Math.abs(data.width || data.size?.width || width));
     }
 
-    if (data.layoutSizingVertical === 'HUG' && (node.type === 'FRAME' || node.type === 'TEXT')) {
+    if (data.layoutSizingVertical === 'HUG') {
       // Don't set height for HUG
       height = node.height;
     } else {
