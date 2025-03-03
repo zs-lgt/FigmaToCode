@@ -55,14 +55,16 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
       return null;
     }
 
-    // Add to parent
+    // Add to parent first
     if (parent) {
       parent.appendChild(node);
     }
 
-    // Set geometry and get new bounds for children
+    // Now set all properties after the node is added to parent
     const creator = new BaseNodeCreator();
+    creator.setBaseProperties(node, data);
     const nodeBounds = creator.setGeometry(node, data, parentBounds);
+    creator.setAppearance(node, data);
 
     // Process children
     if (data.children && 'appendChild' in node && data.type !== 'TEXT') {
@@ -135,17 +137,17 @@ export async function importFigmaJSON(jsonData: any): Promise<void> {
     containerFrame.name = jsonData.name || 'Imported Design';
     
     // Set auto layout properties
-    containerFrame.layoutMode = 'VERTICAL';
-    containerFrame.primaryAxisSizingMode = 'AUTO';
-    containerFrame.counterAxisSizingMode = 'AUTO';
-    containerFrame.layoutAlign = 'STRETCH';
-    containerFrame.primaryAxisAlignItems = 'MIN';
-    containerFrame.counterAxisAlignItems = 'MIN';
-    containerFrame.itemSpacing = 0;
-    containerFrame.paddingLeft = 0;
-    containerFrame.paddingRight = 0;
-    containerFrame.paddingTop = 0;
-    containerFrame.paddingBottom = 0;
+    // containerFrame.layoutMode = 'VERTICAL';
+    // containerFrame.primaryAxisSizingMode = 'AUTO';
+    // containerFrame.counterAxisSizingMode = 'AUTO';
+    // containerFrame.layoutAlign = 'STRETCH';
+    // containerFrame.primaryAxisAlignItems = 'MIN';
+    // containerFrame.counterAxisAlignItems = 'MIN';
+    // containerFrame.itemSpacing = 0;
+    // containerFrame.paddingLeft = 0;
+    // containerFrame.paddingRight = 0;
+    // containerFrame.paddingTop = 0;
+    // containerFrame.paddingBottom = 0;
 
     // Find the bounds of the content
     let minX = Infinity;

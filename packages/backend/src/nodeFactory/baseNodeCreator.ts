@@ -18,9 +18,90 @@ export class BaseNodeCreator implements NodeCreator {
     if (data.locked !== undefined) node.locked = data.locked;
     if (data.opacity !== undefined) node.opacity = data.opacity;
     
-    // Set layout align
+    // Set layout mode first - this is critical for parent nodes
+    if ('layoutMode' in node && data.layoutMode) {
+      console.log(`[${node.name}] Setting layoutMode:`, data.layoutMode);
+      node.layoutMode = data.layoutMode;
+      
+      // If this is a parent node with layoutMode, ensure it's fully set up
+      if ('primaryAxisSizingMode' in node && data.primaryAxisSizingMode) {
+        node.primaryAxisSizingMode = data.primaryAxisSizingMode;
+      }
+      if ('counterAxisSizingMode' in node && data.counterAxisSizingMode) {
+        node.counterAxisSizingMode = data.counterAxisSizingMode;
+      }
+      if ('primaryAxisAlignItems' in node && data.primaryAxisAlignItems) {
+        node.primaryAxisAlignItems = data.primaryAxisAlignItems;
+      }
+      if ('counterAxisAlignItems' in node && data.counterAxisAlignItems) {
+        node.counterAxisAlignItems = data.counterAxisAlignItems;
+      }
+      if ('paddingLeft' in node && data.padding) {
+        node.paddingLeft = data.padding;
+        node.paddingRight = data.padding;
+        node.paddingTop = data.padding;
+        node.paddingBottom = data.padding;
+      }
+      if ('itemSpacing' in node && data.itemSpacing !== undefined) {
+        node.itemSpacing = data.itemSpacing;
+      }
+    }
+
+    // Set layout align for child nodes
     if ('layoutAlign' in node && data.layoutAlign) {
+      console.log(`[${node.name}] Setting layoutAlign:`, data.layoutAlign);
       node.layoutAlign = data.layoutAlign;
+    }
+
+
+    // Check if node supports layout sizing and either has layoutMode or parent has layoutMode
+    if ('layoutSizingHorizontal' in node && 'layoutSizingVertical' in node) {
+      const parent = node.parent;
+      
+      // 检查父节点是否支持自动布局
+      const isParentAutoLayout = parent && (
+        parent.type === 'FRAME' || 
+        parent.type === 'COMPONENT' || 
+        parent.type === 'INSTANCE'
+      ) && 'layoutMode' in parent;
+
+      // 检查当前节点是否支持自动布局
+      const isNodeAutoLayout = 'layoutMode' in node && node.layoutMode;
+      
+      // 如果父节点支持自动布局，强制设置其 layoutMode
+      if (isParentAutoLayout && !parent.layoutMode && data.parentLayoutMode) {
+        (parent as FrameNode).layoutMode = data.parentLayoutMode;
+      }
+
+      const hasAutoLayout = isNodeAutoLayout || (isParentAutoLayout && parent.layoutMode);
+      
+      if (hasAutoLayout && node.type !== 'FRAME') {
+        if (data.layoutSizingHorizontal) {
+          console.log(`[${node.name}] Setting layoutSizingHorizontal:`, data.layoutSizingHorizontal);
+          node.layoutSizingHorizontal = data.layoutSizingHorizontal;
+        }
+        if (data.layoutSizingVertical) {
+          console.log(`[${node.name}] Setting layoutSizingVertical:`, data.layoutSizingVertical);
+          node.layoutSizingVertical = data.layoutSizingVertical;
+        }
+        
+        // 验证设置后的值
+        console.log(`[${node.name}] After setting:`, {
+          mode: 'layoutMode' in node ? node.layoutMode : undefined,
+          parentMode: parent && 'layoutMode' in parent ? parent.layoutMode : undefined,
+          horizontal: node.layoutSizingHorizontal,
+          vertical: node.layoutSizingVertical,
+          nodeType: node.type,
+          parentType: parent?.type
+        });
+      } else {
+        console.log(`[${node.name}] Parent info:`, {
+          type: parent?.type,
+          layoutMode: parent && 'layoutMode' in parent ? parent.layoutMode : undefined,
+          isAutoLayout: isParentAutoLayout
+        });
+        console.log(`[${node.name}] Skipping layout sizing - no auto layout context found`);
+      }
     }
   }
 
