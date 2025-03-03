@@ -66,6 +66,25 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
     const nodeBounds = creator.setGeometry(node, data, parentBounds);
     creator.setAppearance(node, data);
 
+    // 如果当前节点是FRAME并且有layoutMode，先设置它
+    if (node.type === 'FRAME' && data.layoutMode) {
+      console.log(`[${node.name}] Setting parent layoutMode:`, data.layoutMode);
+      node.layoutMode = data.layoutMode;
+      
+      if (data.primaryAxisSizingMode) {
+        node.primaryAxisSizingMode = data.primaryAxisSizingMode;
+      }
+      if (data.counterAxisSizingMode) {
+        node.counterAxisSizingMode = data.counterAxisSizingMode;
+      }
+      if (data.primaryAxisAlignItems) {
+        node.primaryAxisAlignItems = data.primaryAxisAlignItems;
+      }
+      if (data.counterAxisAlignItems) {
+        node.counterAxisAlignItems = data.counterAxisAlignItems;
+      }
+    }
+
     // Process children
     if (data.children && 'appendChild' in node && data.type !== 'TEXT') {
       // 如果是 instance 节点，使用其自身的位置作为子节点的参考点
@@ -74,8 +93,31 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
         y: data.relativeTransform ? data.relativeTransform[1][2] : 0
       } : nodeBounds;
 
+      // 先处理所有子节点
       for (const childData of data.children) {
         await importNode(childData, node as BaseNode & ChildrenMixin, childParentBounds);
+      }
+    }
+
+    // 在所有子节点处理完后，如果当前节点是FRAME并且需要设置layoutSizing，再设置它
+    if (node && data.type === 'FRAME' && (data.layoutSizingHorizontal || data.layoutSizingVertical)) {
+      try {
+        const nodeInfo = figma.getNodeById(node.id) as FrameNode;
+        if (nodeInfo && nodeInfo.type === 'FRAME') {
+          console.log(`[${node.name}] Setting layoutSizing after children:`, {
+            horizontal: data.layoutSizingHorizontal,
+            vertical: data.layoutSizingVertical
+          });
+          
+          if (data.layoutSizingHorizontal) {
+            nodeInfo.layoutSizingHorizontal = data.layoutSizingHorizontal;
+          }
+          if (data.layoutSizingVertical) {
+            nodeInfo.layoutSizingVertical = data.layoutSizingVertical;
+          }
+        }
+      } catch (error) {
+        console.warn(`[${node.name}] Error setting layoutSizing:`, error);
       }
     }
 

@@ -84,23 +84,6 @@ export class BaseNodeCreator implements NodeCreator {
           console.log(`[${node.name}] Setting layoutSizingVertical:`, data.layoutSizingVertical);
           node.layoutSizingVertical = data.layoutSizingVertical;
         }
-        
-        // 验证设置后的值
-        console.log(`[${node.name}] After setting:`, {
-          mode: 'layoutMode' in node ? node.layoutMode : undefined,
-          parentMode: parent && 'layoutMode' in parent ? parent.layoutMode : undefined,
-          horizontal: node.layoutSizingHorizontal,
-          vertical: node.layoutSizingVertical,
-          nodeType: node.type,
-          parentType: parent?.type
-        });
-      } else {
-        console.log(`[${node.name}] Parent info:`, {
-          type: parent?.type,
-          layoutMode: parent && 'layoutMode' in parent ? parent.layoutMode : undefined,
-          isAutoLayout: isParentAutoLayout
-        });
-        console.log(`[${node.name}] Skipping layout sizing - no auto layout context found`);
       }
     }
   }

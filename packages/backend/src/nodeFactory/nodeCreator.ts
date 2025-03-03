@@ -271,6 +271,33 @@ export class FrameNodeCreator extends BaseNodeCreator {
     // Set appearance
     this.setAppearance(node, data);
     
+    // 通过节点ID获取节点信息并设置layoutSizing属性
+    try {
+      if (data.layoutSizingHorizontal || data.layoutSizingVertical) {
+        // 确保节点已经被添加到文档中
+        if (node.parent) {
+          const nodeInfo = figma.getNodeById(node.id);
+          if (nodeInfo && nodeInfo.type === 'FRAME') {
+            console.log(`[${node.name}] Setting layoutSizing through nodeInfo:`, {
+              horizontal: data.layoutSizingHorizontal,
+              vertical: data.layoutSizingVertical
+            });
+            
+            if (data.layoutSizingHorizontal) {
+              nodeInfo.layoutSizingHorizontal = data.layoutSizingHorizontal;
+            }
+            if (data.layoutSizingVertical) {
+              nodeInfo.layoutSizingVertical = data.layoutSizingVertical;
+            }
+          }
+        } else {
+          console.warn(`[${node.name}] Node not in document yet, cannot set layoutSizing`);
+        }
+      }
+    } catch (error) {
+      console.warn(`[${node.name}] Error setting layoutSizing:`, error);
+    }
+    
     return node;
   }
 }
