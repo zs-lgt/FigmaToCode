@@ -42,6 +42,85 @@ type PluginUIProps = {
   gradients: { cssPreview: string; exportValue: string }[];
 };
 
+interface MessageModalProps {
+  message: string;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const MessageModal: React.FC<MessageModalProps> = ({ message, isOpen, onClose }) => {
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopy = () => {
+    copy(message);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl transform transition-all">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+            大模型输出
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 transition-colors"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="px-6 py-4">
+          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-4">
+            <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono">
+              {message}
+            </pre>
+          </div>
+        </div>
+        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 rounded-b-lg flex justify-end space-x-3">
+          <button
+            onClick={handleCopy}
+            className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              isCopied
+                ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+            }`}
+          >
+            <svg 
+              className="mr-2 h-4 w-4" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth="2" 
+                d={isCopied 
+                  ? "M5 13l4 4L19 7" 
+                  : "M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+                }
+              />
+            </svg>
+            {isCopied ? '已复制' : '复制内容'}
+          </button>
+          <button
+            onClick={onClose}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            确定
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const PluginUI = (props: PluginUIProps) => {
   const [isResponsiveExpanded, setIsResponsiveExpanded] = useState(false);
   const [uiJsonInput, setUiJsonInput] = useState('');
@@ -49,20 +128,24 @@ export const PluginUI = (props: PluginUIProps) => {
   const [enableCodeGen, setEnableCodeGen] = useState(true);
   const [showNL2FigmaModal, setShowNL2FigmaModal] = useState(false);
   const [nl2figmaInput, setNl2figmaInput] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // 处理插件消息
   useEffect(() => {
     const messageHandler = (event: MessageEvent) => {
       const msg = event.data.pluginMessage;
       if (msg && msg.type === 'success') {
-        alert(msg.data);
+        setModalMessage(msg.data);
+        setIsModalOpen(true);
         // 如果是组件生成成功，关闭模态框并清空输入
         if (msg.data === '组件生成成功') {
           setShowNL2FigmaModal(false);
           setNl2figmaInput('');
         }
       } else if (msg && msg.type === 'error') {
-        alert(msg.data);
+        setModalMessage(msg.data);
+        setIsModalOpen(true);
       }
     };
     window.addEventListener('message', messageHandler);
@@ -421,6 +504,11 @@ export const PluginUI = (props: PluginUIProps) => {
         id="resize-handle"
         className="fixed bottom-0 right-0 w-4 h-4 cursor-se-resize"
         onMouseDown={initResize}
+      />
+      <MessageModal
+        message={modalMessage}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
       />
     </div>
   );
