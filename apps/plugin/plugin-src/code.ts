@@ -205,6 +205,51 @@ const standardMode = async () => {
           data: `导入Figma文件失败: ${error.message}`,
         });
       });
+    } else if (msg.type === 'nl2figma-generate') {
+      (async () => {  // 使用立即执行的异步函数
+        try {
+          const API_BASE_URL = 'https://occ.10jqka.com.cn/figma2code/webapi_fuzz/v1/nl2figma';
+          const response = await fetch(`${API_BASE_URL}`, {
+            method: 'POST',
+            headers: {
+            },
+            body: JSON.stringify({
+              query: msg.query,
+              traceId: '123'
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          
+          if (data.status === 'success' && data.figma_json) {
+            try {
+              const parsedJson = JSON.parse(data.figma_json);
+              // 导入生成的组件
+              await importFigmaJSON(parsedJson);
+              // 发送成功消息
+              figma.ui.postMessage({
+                type: "success",
+                data: data.llmout || '组件生成成功'
+              });
+            } catch (parseError) {
+              throw new Error('JSON解析错误');
+            }
+          } else {
+            throw new Error(`API返回状态错误: ${data.status}`);
+          }
+        } catch (error: unknown) {  // 明确指定error类型为unknown
+          const errorMessage = error instanceof Error ? error.message : '未知错误';
+          console.error('生成组件失败:', error);
+          figma.ui.postMessage({
+            type: "error",
+            data: `生成组件失败: ${errorMessage}`
+          });
+        }
+      })();  // 立即执行异步函数
     } else if (msg.type === 'export-nodes') {
       const nodes = figma.currentPage.children;
       exportNodes(nodes, msg.optimize).then(async nodesData => {

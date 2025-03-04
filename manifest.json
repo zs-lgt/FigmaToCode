@@ -8,7 +8,15 @@
   "capabilities": ["inspect", "codegen", "vscode"],
   "permissions": [],
   "networkAccess": {
-    "allowedDomains": ["https://via.placeholder.com", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://appstore.10jqka.com.cn", "https://s.thsi.cn", "https://cdn.tailwindcss.com"]
+    "allowedDomains": [
+      "https://via.placeholder.com",
+      "https://cdn.jsdelivr.net",
+      "https://unpkg.com",
+      "https://appstore.10jqka.com.cn",
+      "https://s.thsi.cn",
+      "https://cdn.tailwindcss.com",
+      "https://occ.10jqka.com.cn"
+    ]
   },
   "codegenLanguages": [
     { "label": "HTML", "value": "html" },

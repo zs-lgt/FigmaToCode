@@ -47,6 +47,27 @@ export const PluginUI = (props: PluginUIProps) => {
   const [uiJsonInput, setUiJsonInput] = useState('');
   const [showUiJsonModal, setShowUiJsonModal] = useState(false);
   const [enableCodeGen, setEnableCodeGen] = useState(true);
+  const [showNL2FigmaModal, setShowNL2FigmaModal] = useState(false);
+  const [nl2figmaInput, setNl2figmaInput] = useState('');
+
+  // 处理插件消息
+  useEffect(() => {
+    const messageHandler = (event: MessageEvent) => {
+      const msg = event.data.pluginMessage;
+      if (msg && msg.type === 'success') {
+        alert(msg.data);
+        // 如果是组件生成成功，关闭模态框并清空输入
+        if (msg.data === '组件生成成功') {
+          setShowNL2FigmaModal(false);
+          setNl2figmaInput('');
+        }
+      } else if (msg && msg.type === 'error') {
+        alert(msg.data);
+      }
+    };
+    window.addEventListener('message', messageHandler);
+    return () => window.removeEventListener('message', messageHandler);
+  }, []);
 
   useEffect(() => {
     // 从插件获取初始状态
@@ -163,6 +184,28 @@ export const PluginUI = (props: PluginUIProps) => {
     }, '*');
   };
 
+  const handleNL2FigmaClick = () => {
+    setShowNL2FigmaModal(true);
+  };
+
+  const handleNL2FigmaSubmit = () => {
+    try {
+      // 发送消息到插件后端处理API调用
+      window.parent.postMessage(
+        { 
+          pluginMessage: { 
+            type: "nl2figma-generate",
+            query: nl2figmaInput
+          } 
+        },
+        "*"
+      );
+    } catch (error: any) {
+      console.error('发送请求失败:', error);
+      alert(`发送请求失败: ${error.message}`);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
@@ -222,6 +265,12 @@ export const PluginUI = (props: PluginUIProps) => {
           >
             导出设计信息（完整版）
           </button>
+          <button
+            onClick={handleNL2FigmaClick}
+            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            文生组件
+          </button>
         </div>
       </div>
 
@@ -265,6 +314,38 @@ export const PluginUI = (props: PluginUIProps) => {
                 onClick={handleImportUiJson}
               >
                 导入
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* NL2Figma Modal */}
+      {showNL2FigmaModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
+            <h3 className="text-lg font-medium mb-4 dark:text-white">文生组件</h3>
+            <textarea
+              value={nl2figmaInput}
+              onChange={(e) => setNl2figmaInput(e.target.value)}
+              className="w-full h-32 p-2 border rounded-md mb-4 dark:bg-gray-700 dark:text-white"
+              placeholder="请输入组件描述，例如：实现ios顶部状态栏，时间为5:20，仅带蓝牙和电池icon"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowNL2FigmaModal(false);
+                  setNl2figmaInput('');
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleNL2FigmaSubmit}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                生成
               </button>
             </div>
           </div>
