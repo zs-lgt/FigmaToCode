@@ -60,10 +60,10 @@ const MessageModal: React.FC<MessageModalProps> = ({ message, isOpen, onClose })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl transform transition-all">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+    <div className="fixed inset-2 bg-black bg-opacity-50 flex items-start justify-center z-50 overflow-auto">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-h-[calc(100vh-1rem)] flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+          <h3 className="text-base font-medium text-gray-900 dark:text-white">
             大模型输出
           </h3>
           <button
@@ -75,24 +75,24 @@ const MessageModal: React.FC<MessageModalProps> = ({ message, isOpen, onClose })
             </svg>
           </button>
         </div>
-        <div className="px-6 py-4">
-          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-4">
-            <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono">
+        <div className="px-4 py-3 overflow-auto flex-grow">
+          <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-3">
+            <pre className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 font-mono break-words">
               {message}
             </pre>
           </div>
         </div>
-        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900 rounded-b-lg flex justify-end space-x-3">
+        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 rounded-b-lg flex justify-end space-x-2 shrink-0">
           <button
             onClick={handleCopy}
-            className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
               isCopied
                 ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
             }`}
           >
             <svg 
-              className="mr-2 h-4 w-4" 
+              className="mr-1.5 h-4 w-4" 
               fill="none" 
               stroke="currentColor" 
               viewBox="0 0 24 24"
@@ -111,7 +111,7 @@ const MessageModal: React.FC<MessageModalProps> = ({ message, isOpen, onClose })
           </button>
           <button
             onClick={onClose}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             确定
           </button>
@@ -130,22 +130,34 @@ export const PluginUI = (props: PluginUIProps) => {
   const [nl2figmaInput, setNl2figmaInput] = useState('');
   const [modalMessage, setModalMessage] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // 处理插件消息
   useEffect(() => {
     const messageHandler = (event: MessageEvent) => {
       const msg = event.data.pluginMessage;
       if (msg && msg.type === 'success') {
-        setModalMessage(msg.data);
-        setIsModalOpen(true);
-        // 如果是组件生成成功，关闭模态框并清空输入
-        if (msg.data === '组件生成成功') {
-          setShowNL2FigmaModal(false);
-          setNl2figmaInput('');
+        setIsLoading(false);
+        // 只有文生组件相关的消息才使用 Modal
+        if (msg.source === 'nl2figma') {
+          setModalMessage(msg.data);
+          setIsModalOpen(true);
+          // 如果是组件生成成功，关闭模态框并清空输入
+          if (msg.data === '组件生成成功') {
+            setShowNL2FigmaModal(false);
+            setNl2figmaInput('');
+          }
         }
       } else if (msg && msg.type === 'error') {
-        setModalMessage(msg.data);
-        setIsModalOpen(true);
+        setIsLoading(false);
+        // 只有文生组件相关的错误才使用 Modal
+        if (msg.source === 'nl2figma') {
+          setModalMessage(msg.data);
+          setIsModalOpen(true);
+        } else {
+          // 其他错误消息使用 alert
+          alert(msg.data);
+        }
       }
     };
     window.addEventListener('message', messageHandler);
@@ -273,6 +285,7 @@ export const PluginUI = (props: PluginUIProps) => {
 
   const handleNL2FigmaSubmit = () => {
     try {
+      setIsLoading(true);
       // 发送消息到插件后端处理API调用
       window.parent.postMessage(
         { 
@@ -284,6 +297,7 @@ export const PluginUI = (props: PluginUIProps) => {
         "*"
       );
     } catch (error: any) {
+      setIsLoading(false);
       console.error('发送请求失败:', error);
       alert(`发送请求失败: ${error.message}`);
     }
@@ -407,12 +421,24 @@ export const PluginUI = (props: PluginUIProps) => {
       {showNL2FigmaModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
-            <h3 className="text-lg font-medium mb-4 dark:text-white">文生组件</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium dark:text-white">文生组件</h3>
+              {isLoading && (
+                <div className="flex items-center text-sm text-blue-600 dark:text-blue-400">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  生成中...
+                </div>
+              )}
+            </div>
             <textarea
               value={nl2figmaInput}
               onChange={(e) => setNl2figmaInput(e.target.value)}
               className="w-full h-32 p-2 border rounded-md mb-4 dark:bg-gray-700 dark:text-white"
               placeholder="请输入组件描述，例如：实现ios顶部状态栏，时间为5:20，仅带蓝牙和电池icon"
+              disabled={isLoading}
             />
             <div className="flex justify-end gap-2">
               <button
@@ -421,14 +447,16 @@ export const PluginUI = (props: PluginUIProps) => {
                   setNl2figmaInput('');
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                disabled={isLoading}
               >
                 取消
               </button>
               <button
                 onClick={handleNL2FigmaSubmit}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isLoading}
               >
-                生成
+                {isLoading ? '生成中...' : '生成'}
               </button>
             </div>
           </div>

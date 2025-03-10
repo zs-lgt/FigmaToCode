@@ -22,15 +22,16 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
         } catch (error) {
           // 兜底方案：本地组件放本地
           try {
-            const instance : InstanceNode = figma.getNodeById(data.id);
-            const component = await instance?.getMainComponentAsync();
-            
-            if (component) {
-              // 创建实例
-              node = component.createInstance();
-              // 保持原有的x和y属性
-              if (data.x !== undefined) node.x = data.x;
-              if (data.y !== undefined) node.y = data.y;
+            const foundNode = figma.getNodeById(data.id);
+            if (foundNode && foundNode.type === 'INSTANCE') {
+              const component = await foundNode.getMainComponentAsync();
+              if (component) {
+                // 创建实例
+                node = component.createInstance();
+                // 保持原有的x和y属性
+                if (data.x !== undefined) node.x = data.x;
+                if (data.y !== undefined) node.y = data.y;
+              }
             }
           } catch (error) {
             console.log(error);
@@ -174,23 +175,6 @@ export async function importFigmaJSON(jsonData: any): Promise<void> {
       contentToImport = [jsonData];
     }
 
-    // Create a container frame for the imported content
-    const containerFrame = figma.createFrame();
-    containerFrame.name = jsonData.name || 'Imported Design';
-    
-    // Set auto layout properties
-    // containerFrame.layoutMode = 'VERTICAL';
-    // containerFrame.primaryAxisSizingMode = 'AUTO';
-    // containerFrame.counterAxisSizingMode = 'AUTO';
-    // containerFrame.layoutAlign = 'STRETCH';
-    // containerFrame.primaryAxisAlignItems = 'MIN';
-    // containerFrame.counterAxisAlignItems = 'MIN';
-    // containerFrame.itemSpacing = 0;
-    // containerFrame.paddingLeft = 0;
-    // containerFrame.paddingRight = 0;
-    // containerFrame.paddingTop = 0;
-    // containerFrame.paddingBottom = 0;
-
     // Find the bounds of the content
     let minX = Infinity;
     let minY = Infinity;
@@ -228,34 +212,20 @@ export async function importFigmaJSON(jsonData: any): Promise<void> {
       maxY = 2000;
     }
 
-    // Add padding
-    const padding = 100;
-    minX -= padding;
-    minY -= padding;
-    maxX += padding;
-    maxY += padding;
-
-    // Set container frame size and position
-    containerFrame.resize(maxX - minX, maxY - minY);
-    containerFrame.x = 0;
-    containerFrame.y = 0;
-    containerFrame.fills = [];
-    
-    // Add to current page
-    figma.currentPage.appendChild(containerFrame);
-    
-    // Use minX, minY as offset to convert absolute positions to relative
-    const containerBounds = { x: minX, y: minY };
-    
-    // Import all content
+    // Import all content directly to the current page
+    const importedNodes: SceneNode[] = [];
     for (const nodeData of contentToImport) {
-      await importNode(nodeData, containerFrame, containerBounds);
+      const node = await importNode(nodeData, figma.currentPage, { x: minX, y: minY });
+      if (node) {
+        importedNodes.push(node);
+      }
     }
 
-    // Select and zoom to the imported content
-    figma.currentPage.selection = [containerFrame];
-    figma.viewport.scrollAndZoomIntoView([containerFrame]);
-    
+    // Select the imported content
+    if (importedNodes.length > 0) {
+      figma.currentPage.selection = importedNodes;
+      figma.viewport.scrollAndZoomIntoView(importedNodes);
+    }
   } catch (error) {
     console.error('Error importing Figma JSON:', error);
     throw error;

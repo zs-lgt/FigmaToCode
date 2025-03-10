@@ -233,6 +233,7 @@ const standardMode = async () => {
               // 发送成功消息
               figma.ui.postMessage({
                 type: "success",
+                source: "nl2figma",
                 data: data.llmout || '组件生成成功'
               });
             } catch (parseError) {
@@ -246,6 +247,7 @@ const standardMode = async () => {
           console.error('生成组件失败:', error);
           figma.ui.postMessage({
             type: "error",
+            source: "nl2figma",
             data: `生成组件失败: ${errorMessage}`
           });
         }
