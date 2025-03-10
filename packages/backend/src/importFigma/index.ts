@@ -67,25 +67,6 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
     const nodeBounds = creator.setGeometry(node, data, parentBounds);
     creator.setAppearance(node, data);
 
-    // 如果当前节点是FRAME并且有layoutMode，先设置它
-    if (node.type === 'FRAME' && data.layoutMode) {
-      console.log(`[${node.name}] Setting parent layoutMode:`, data.layoutMode);
-      node.layoutMode = data.layoutMode;
-      
-      if (data.primaryAxisSizingMode) {
-        node.primaryAxisSizingMode = data.primaryAxisSizingMode;
-      }
-      if (data.counterAxisSizingMode) {
-        node.counterAxisSizingMode = data.counterAxisSizingMode;
-      }
-      if (data.primaryAxisAlignItems) {
-        node.primaryAxisAlignItems = data.primaryAxisAlignItems;
-      }
-      if (data.counterAxisAlignItems) {
-        node.counterAxisAlignItems = data.counterAxisAlignItems;
-      }
-    }
-
     // Process children
     if (data.children && 'appendChild' in node && data.type !== 'TEXT') {
       // 如果是 instance 节点，使用其自身的位置作为子节点的参考点
@@ -105,11 +86,6 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
       try {
         const nodeInfo = figma.getNodeById(node.id) as FrameNode;
         if (nodeInfo && nodeInfo.type === 'FRAME') {
-          console.log(`[${node.name}] Setting layoutSizing after children:`, {
-            horizontal: data.layoutSizingHorizontal,
-            vertical: data.layoutSizingVertical
-          });
-          
           if (data.layoutSizingHorizontal) {
             nodeInfo.layoutSizingHorizontal = data.layoutSizingHorizontal;
           }
