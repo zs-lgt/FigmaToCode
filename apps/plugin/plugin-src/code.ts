@@ -233,22 +233,8 @@ const standardMode = async () => {
     } else if (msg.type === 'nl2figma-generate') {
       (async () => {  // 使用立即执行的异步函数
         try {
-          const API_BASE_URL = 'https://occ.10jqka.com.cn/figma2code/webapi_fuzz/v1/nl2figma';
-          const response = await fetch(`${API_BASE_URL}`, {
-            method: 'POST',
-            headers: {
-            },
-            body: JSON.stringify({
-              query: msg.query,
-              traceId: '123'
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
+          // 调用API
+          const data = await callNL2FigmaAPI(msg.query);
           
           if (data.status === 'success' && data.figma_json) {
             try {
@@ -259,23 +245,13 @@ const standardMode = async () => {
               // 将query和llmout作为一对数据存储到节点信息中
               if (importedNodes && importedNodes.length > 0 && data.llmout) {
                 for (const node of importedNodes) {
-                  // 创建历史记录数组，存储当前的query和llmout
-                  const historyData = JSON.stringify([[msg.query, data.llmout]]);
-                  // 设置自定义属性，存储历史记录
-                  node.setPluginData('llmOutHistory', historyData);
-                  
-                  // 打印日志，确认数据已存储
-                  console.log(`[文生组件] 已存储历史记录: ${historyData}`);
-                  console.log(`[文生组件] 验证存储: ${node.getPluginData('llmOutHistory')}`);
+                  // 存储历史记录
+                  storeHistoryData(node, msg.query, data.llmout);
                 }
               }
               
               // 发送成功消息
-              figma.ui.postMessage({
-                type: "success",
-                source: "nl2figma",
-                data: data.llmout || '组件生成成功'
-              });
+              sendResultMessage(true, "nl2figma", data.llmout || '组件生成成功');
             } catch (parseError) {
               throw new Error('JSON解析错误');
             }
@@ -285,11 +261,7 @@ const standardMode = async () => {
         } catch (error: unknown) {  // 明确指定error类型为unknown
           const errorMessage = error instanceof Error ? error.message : '未知错误';
           console.error('生成组件失败:', error);
-          figma.ui.postMessage({
-            type: "error",
-            source: "nl2figma",
-            data: `生成组件失败: ${errorMessage}`
-          });
+          sendResultMessage(false, "nl2figma", `生成组件失败: ${errorMessage}`);
         }
       })();  // 立即执行异步函数
     } else if (msg.type === 'check-selection') {
@@ -308,47 +280,13 @@ const standardMode = async () => {
           const selectedNode = selection[0];
           
           // 获取节点的历史上下文
-          const llmOutHistoryStr = selectedNode.getPluginData('llmOutHistory') || '';
-          console.log(`[修改组件] 获取到历史记录: ${llmOutHistoryStr}`);
-          
-          // 构建历史记录数组
-          let historyArray = [];
-          if (llmOutHistoryStr) {
-            try {
-              // 尝试解析已存储的JSON历史记录
-              historyArray = JSON.parse(llmOutHistoryStr);
-              console.log(`[修改组件] 解析历史记录成功: `, historyArray);
-            } catch (error) {
-              // 如果解析失败，可能是旧格式，创建一个新的历史记录
-              console.warn('解析历史记录失败，创建新的历史记录');
-              // 旧格式是直接存储的llmout，将其作为没有query的历史记录
-              historyArray = [["", llmOutHistoryStr]];
-              console.log(`[修改组件] 使用旧格式历史记录: `, historyArray);
-            }
-          }
-          
-          // 构建请求
-          const API_BASE_URL = 'https://occ.10jqka.com.cn/figma2code/webapi_fuzz/v1/nl2figma';
+          const historyArray = getHistoryData(selectedNode);
           
           // 构建查询字符串，添加前缀
           const queryWithPrefix = `用户当前选择了【${selectedNode.name}】节点，并提出意见：${msg.query}`;
           
-          const response = await fetch(`${API_BASE_URL}`, {
-            method: 'POST',
-            headers: {
-            },
-            body: JSON.stringify({
-              query: queryWithPrefix,
-              history: historyArray,
-              traceId: '123'
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          const data = await response.json();
+          // 调用API
+          const data = await callNL2FigmaAPI(queryWithPrefix, historyArray);
           
           if (data.status === 'success' && data.figma_json) {
             try {
@@ -361,23 +299,7 @@ const standardMode = async () => {
               const originalY = selectedNode.y;
               
               // 获取原有的历史记录（在删除节点前获取）
-              let existingHistoryArray = [];
-              const existingHistoryStr = selectedNode.getPluginData('llmOutHistory') || '';
-              console.log(`[修改组件] 删除节点前获取历史记录: ${existingHistoryStr}`);
-              
-              if (existingHistoryStr) {
-                try {
-                  // 尝试解析已存储的JSON历史记录
-                  existingHistoryArray = JSON.parse(existingHistoryStr);
-                  console.log(`[修改组件] 解析历史记录成功: `, existingHistoryArray);
-                } catch (error) {
-                  // 如果解析失败，可能是旧格式，创建一个新的历史记录
-                  console.warn('解析历史记录失败，创建新的历史记录');
-                  // 旧格式是直接存储的llmout，将其作为没有query的历史记录
-                  existingHistoryArray = [["", existingHistoryStr]];
-                  console.log(`[修改组件] 使用旧格式历史记录: `, existingHistoryArray);
-                }
-              }
+              const existingHistoryArray = getHistoryData(selectedNode);
               
               // 删除原节点
               selectedNode.remove();
@@ -408,16 +330,8 @@ const standardMode = async () => {
                 
                 // 存储llmout历史
                 if (data.llmout) {
-                  // 添加当前的query和llmout到历史记录
-                  existingHistoryArray.push([queryWithPrefix, data.llmout]);
-                  
-                  // 将历史记录JSON字符串存储到新节点中
-                  const historyJson = JSON.stringify(existingHistoryArray);
-                  newNode.setPluginData('llmOutHistory', historyJson);
-                  
-                  // 打印日志，确认数据已存储
-                  console.log(`[修改组件] 已存储更新的历史记录: ${historyJson}`);
-                  console.log(`[修改组件] 验证存储: ${newNode.getPluginData('llmOutHistory')}`);
+                  // 存储历史记录
+                  storeHistoryData(newNode, queryWithPrefix, data.llmout, existingHistoryArray);
                 }
                 
                 // 选中新节点
@@ -425,11 +339,7 @@ const standardMode = async () => {
               }
               
               // 发送成功消息
-              figma.ui.postMessage({
-                type: "success",
-                source: "modify-component",
-                data: data.llmout || '组件修改成功'
-              });
+              sendResultMessage(true, "modify-component", data.llmout || '组件修改成功');
             } catch (parseError) {
               throw new Error('JSON解析错误');
             }
@@ -437,7 +347,9 @@ const standardMode = async () => {
             throw new Error(`API返回状态错误: ${data.status}`);
           }
         } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : '未知错误';
           console.error('修改组件失败:', error);
+          sendResultMessage(false, "modify-component", `修改组件失败: ${errorMessage}`);
         }
       })();
     } else if (msg.type === 'export-nodes') {
@@ -620,6 +532,79 @@ const codegenMode = async () => {
 
     const blocks: CodegenResult[] = [];
     return blocks;
+  });
+};
+
+// 处理API请求的通用方法
+const callNL2FigmaAPI = async (query: string, history: any[] = [], traceId: string = '123') => {
+  const API_BASE_URL = 'https://occ.10jqka.com.cn/figma2code/webapi_fuzz/v1/nl2figma';
+  const response = await fetch(`${API_BASE_URL}`, {
+    method: 'POST',
+    headers: {},
+    body: JSON.stringify({
+      query,
+      history,
+      traceId
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return await response.json();
+};
+
+// 存储历史记录的通用方法
+const storeHistoryData = (node: SceneNode, query: string, llmout: string, existingHistory: any[] = []) => {
+  try {
+    // 添加当前的query和llmout到历史记录
+    const updatedHistory = [...existingHistory, [query, llmout]];
+    
+    // 将历史记录JSON字符串存储到节点中
+    const historyJson = JSON.stringify(updatedHistory);
+    node.setPluginData('llmOutHistory', historyJson);
+    
+    // 打印日志，确认数据已存储
+    console.log(`[历史记录] 已存储历史记录: ${historyJson}`);
+    console.log(`[历史记录] 验证存储: ${node.getPluginData('llmOutHistory')}`);
+    
+    return updatedHistory;
+  } catch (error) {
+    console.error('存储历史记录失败:', error);
+    return existingHistory;
+  }
+};
+
+// 获取历史记录的通用方法
+const getHistoryData = (node: SceneNode) => {
+  const historyStr = node.getPluginData('llmOutHistory') || '';
+  console.log(`[历史记录] 获取到历史记录: ${historyStr}`);
+  
+  let historyArray = [];
+  if (historyStr) {
+    try {
+      // 尝试解析已存储的JSON历史记录
+      historyArray = JSON.parse(historyStr);
+      console.log(`[历史记录] 解析历史记录成功: `, historyArray);
+    } catch (error) {
+      // 如果解析失败，可能是旧格式，创建一个新的历史记录
+      console.warn('解析历史记录失败，创建新的历史记录');
+      // 旧格式是直接存储的llmout，将其作为没有query的历史记录
+      historyArray = [["", historyStr]];
+      console.log(`[历史记录] 使用旧格式历史记录: `, historyArray);
+    }
+  }
+  
+  return historyArray;
+};
+
+// 发送成功或错误消息的通用方法
+const sendResultMessage = (isSuccess: boolean, source: string, message: string) => {
+  figma.ui.postMessage({
+    type: isSuccess ? "success" : "error",
+    source,
+    data: message
   });
 };
 
