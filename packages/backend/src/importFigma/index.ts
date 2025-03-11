@@ -153,7 +153,7 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
 }
 
 // Entry point for importing Figma JSON
-export async function importFigmaJSON(jsonData: any): Promise<void> {
+export async function importFigmaJSON(jsonData: any): Promise<SceneNode[]> {
   try {
     // Get the actual content to import (skip document and canvas layers)
     let contentToImport: any[] = [];
@@ -226,6 +226,9 @@ export async function importFigmaJSON(jsonData: any): Promise<void> {
       figma.currentPage.selection = importedNodes;
       figma.viewport.scrollAndZoomIntoView(importedNodes);
     }
+    
+    // 返回导入的节点数组
+    return importedNodes;
   } catch (error) {
     console.error('Error importing Figma JSON:', error);
     throw error;

@@ -60,8 +60,8 @@ const MessageModal: React.FC<MessageModalProps> = ({ message, isOpen, onClose })
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-2 bg-black bg-opacity-50 flex items-start justify-center z-50 overflow-auto">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-h-[calc(100vh-1rem)] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-auto" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col m-4">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
           <h3 className="text-base font-medium text-gray-900 dark:text-white">
             大模型输出
@@ -128,6 +128,9 @@ export const PluginUI = (props: PluginUIProps) => {
   const [enableCodeGen, setEnableCodeGen] = useState(true);
   const [showNL2FigmaModal, setShowNL2FigmaModal] = useState(false);
   const [nl2figmaInput, setNl2figmaInput] = useState('');
+  const [showModifyComponentModal, setShowModifyComponentModal] = useState(false);
+  const [modifyComponentInput, setModifyComponentInput] = useState('');
+  const [selectedNodeName, setSelectedNodeName] = useState('');
   const [modalMessage, setModalMessage] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -139,25 +142,29 @@ export const PluginUI = (props: PluginUIProps) => {
       if (msg && msg.type === 'success') {
         setIsLoading(false);
         // 只有文生组件相关的消息才使用 Modal
-        if (msg.source === 'nl2figma') {
+        if (msg.source === 'nl2figma' || msg.source === 'modify-component') {
           setModalMessage(msg.data);
           setIsModalOpen(true);
-          // 如果是组件生成成功，关闭模态框并清空输入
-          if (msg.data === '组件生成成功') {
-            setShowNL2FigmaModal(false);
-            setNl2figmaInput('');
-          }
+          setModifyComponentInput('');
+          setNl2figmaInput('');
         }
       } else if (msg && msg.type === 'error') {
         setIsLoading(false);
         // 只有文生组件相关的错误才使用 Modal
-        if (msg.source === 'nl2figma') {
+        if (msg.source === 'nl2figma' || msg.source === 'modify-component') {
           setModalMessage(msg.data);
           setIsModalOpen(true);
+          // 即使出错也清空输入框
+          if (msg.source === 'modify-component') {
+            setModifyComponentInput('');
+          }
         } else {
           // 其他错误消息使用 alert
           alert(msg.data);
         }
+      } else if (msg && msg.type === 'selected-node-info') {
+        // 接收选中节点的信息
+        setSelectedNodeName(msg.name || '');
       }
     };
     window.addEventListener('message', messageHandler);
@@ -303,6 +310,52 @@ export const PluginUI = (props: PluginUIProps) => {
     }
   };
 
+  const handleModifyComponentClick = () => {
+    // 检查是否有选中的节点
+    window.parent.postMessage(
+      { 
+        pluginMessage: { 
+          type: "check-selection"
+        } 
+      },
+      "*"
+    );
+    
+    // 打开修改组件模态框
+    setShowModifyComponentModal(true);
+  };
+
+  const closeModifyComponentModal = () => {
+    setShowModifyComponentModal(false);
+    setModifyComponentInput(''); // 清空输入框
+  };
+
+  const handleModifyComponentSubmit = () => {
+    try {
+      if (!selectedNodeName) {
+        setModalMessage('请先选择要修改的节点');
+        setIsModalOpen(true);
+        return;
+      }
+      
+      setIsLoading(true);
+      // 发送消息到插件后端处理API调用
+      window.parent.postMessage(
+        { 
+          pluginMessage: { 
+            type: "modify-component",
+            query: modifyComponentInput
+          } 
+        },
+        "*"
+      );
+    } catch (error: any) {
+      setIsLoading(false);
+      console.error('发送请求失败:', error);
+      alert(`发送请求失败: ${error.message}`);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
@@ -368,6 +421,12 @@ export const PluginUI = (props: PluginUIProps) => {
           >
             文生组件
           </button>
+          <button
+            onClick={handleModifyComponentClick}
+            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            修改组件
+          </button>
         </div>
       </div>
 
@@ -419,8 +478,8 @@ export const PluginUI = (props: PluginUIProps) => {
       
       {/* NL2Figma Modal */}
       {showNL2FigmaModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium dark:text-white">文生组件</h3>
               {isLoading && (
@@ -457,6 +516,60 @@ export const PluginUI = (props: PluginUIProps) => {
                 disabled={isLoading}
               >
                 {isLoading ? '生成中...' : '生成'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* 修改组件模态框 */}
+      {showModifyComponentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium dark:text-white">修改组件</h3>
+              {isLoading && (
+                <div className="flex items-center text-sm text-blue-600 dark:text-blue-400">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  修改中...
+                </div>
+              )}
+            </div>
+            
+            {selectedNodeName ? (
+              <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+                当前选择了【{selectedNodeName}】节点
+              </div>
+            ) : (
+              <div className="mb-4 text-sm text-red-500 dark:text-red-400">
+                请先选择要修改的节点
+              </div>
+            )}
+            
+            <textarea
+              value={modifyComponentInput}
+              onChange={(e) => setModifyComponentInput(e.target.value)}
+              className="w-full h-32 p-2 border rounded-md mb-4 dark:bg-gray-700 dark:text-white"
+              placeholder="请输入修改描述，例如：将按钮颜色改为蓝色，文字改为'确认'"
+              disabled={isLoading}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={closeModifyComponentModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                disabled={isLoading}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleModifyComponentSubmit}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                disabled={isLoading || !selectedNodeName}
+              >
+                修改
               </button>
             </div>
           </div>

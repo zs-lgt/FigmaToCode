@@ -102,10 +102,35 @@ const standardMode = async () => {
     enabled: isCodeGenerationEnabled
   });
 
+  // 发送当前选中节点信息
+  const sendSelectedNodeInfo = () => {
+    const selection = figma.currentPage.selection;
+    if (selection.length > 0) {
+      // 只取第一个选中的节点
+      const selectedNode = selection[0];
+      figma.ui.postMessage({
+        type: "selected-node-info",
+        name: selectedNode.name,
+        id: selectedNode.id
+      });
+    } else {
+      figma.ui.postMessage({
+        type: "selected-node-info",
+        name: "",
+        id: ""
+      });
+    }
+  };
+
+  // 初始发送选中节点信息
+  sendSelectedNodeInfo();
+
   figma.on("selectionchange", () => {
     if (isCodeGenerationEnabled) {
       safeRun(userPluginSettings);
     }
+    // 当选择变化时，发送选中节点信息
+    sendSelectedNodeInfo();
   });
 
   figma.ui.on('message', (msg) => {
@@ -229,7 +254,22 @@ const standardMode = async () => {
             try {
               const parsedJson = JSON.parse(data.figma_json);
               // 导入生成的组件
-              await importFigmaJSON(parsedJson);
+              const importedNodes = await importFigmaJSON(parsedJson);
+              
+              // 将query和llmout作为一对数据存储到节点信息中
+              if (importedNodes && importedNodes.length > 0 && data.llmout) {
+                for (const node of importedNodes) {
+                  // 创建历史记录数组，存储当前的query和llmout
+                  const historyData = JSON.stringify([[msg.query, data.llmout]]);
+                  // 设置自定义属性，存储历史记录
+                  node.setPluginData('llmOutHistory', historyData);
+                  
+                  // 打印日志，确认数据已存储
+                  console.log(`[文生组件] 已存储历史记录: ${historyData}`);
+                  console.log(`[文生组件] 验证存储: ${node.getPluginData('llmOutHistory')}`);
+                }
+              }
+              
               // 发送成功消息
               figma.ui.postMessage({
                 type: "success",
@@ -252,6 +292,154 @@ const standardMode = async () => {
           });
         }
       })();  // 立即执行异步函数
+    } else if (msg.type === 'check-selection') {
+      // 检查是否有选中的节点，并发送选中节点的信息
+      sendSelectedNodeInfo();
+    } else if (msg.type === 'modify-component') {
+      (async () => {
+        try {
+          // 检查是否有选中的节点
+          const selection = figma.currentPage.selection;
+          if (selection.length === 0) {
+            throw new Error('请先选择要修改的节点');
+          }
+          
+          // 只取第一个选中的节点
+          const selectedNode = selection[0];
+          
+          // 获取节点的历史上下文
+          const llmOutHistoryStr = selectedNode.getPluginData('llmOutHistory') || '';
+          console.log(`[修改组件] 获取到历史记录: ${llmOutHistoryStr}`);
+          
+          // 构建历史记录数组
+          let historyArray = [];
+          if (llmOutHistoryStr) {
+            try {
+              // 尝试解析已存储的JSON历史记录
+              historyArray = JSON.parse(llmOutHistoryStr);
+              console.log(`[修改组件] 解析历史记录成功: `, historyArray);
+            } catch (error) {
+              // 如果解析失败，可能是旧格式，创建一个新的历史记录
+              console.warn('解析历史记录失败，创建新的历史记录');
+              // 旧格式是直接存储的llmout，将其作为没有query的历史记录
+              historyArray = [["", llmOutHistoryStr]];
+              console.log(`[修改组件] 使用旧格式历史记录: `, historyArray);
+            }
+          }
+          
+          // 构建请求
+          const API_BASE_URL = 'https://occ.10jqka.com.cn/figma2code/webapi_fuzz/v1/nl2figma';
+          
+          // 构建查询字符串，添加前缀
+          const queryWithPrefix = `用户当前选择了【${selectedNode.name}】节点，并提出意见：${msg.query}`;
+          
+          const response = await fetch(`${API_BASE_URL}`, {
+            method: 'POST',
+            headers: {
+            },
+            body: JSON.stringify({
+              query: queryWithPrefix,
+              history: historyArray,
+              traceId: '123'
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          
+          if (data.status === 'success' && data.figma_json) {
+            try {
+              const parsedJson = JSON.parse(data.figma_json);
+              
+              // 记录原节点的位置和父节点
+              const originalParent = selectedNode.parent;
+              const originalIndex = originalParent ? Array.from(originalParent.children).indexOf(selectedNode) : -1;
+              const originalX = selectedNode.x;
+              const originalY = selectedNode.y;
+              
+              // 获取原有的历史记录（在删除节点前获取）
+              let existingHistoryArray = [];
+              const existingHistoryStr = selectedNode.getPluginData('llmOutHistory') || '';
+              console.log(`[修改组件] 删除节点前获取历史记录: ${existingHistoryStr}`);
+              
+              if (existingHistoryStr) {
+                try {
+                  // 尝试解析已存储的JSON历史记录
+                  existingHistoryArray = JSON.parse(existingHistoryStr);
+                  console.log(`[修改组件] 解析历史记录成功: `, existingHistoryArray);
+                } catch (error) {
+                  // 如果解析失败，可能是旧格式，创建一个新的历史记录
+                  console.warn('解析历史记录失败，创建新的历史记录');
+                  // 旧格式是直接存储的llmout，将其作为没有query的历史记录
+                  existingHistoryArray = [["", existingHistoryStr]];
+                  console.log(`[修改组件] 使用旧格式历史记录: `, existingHistoryArray);
+                }
+              }
+              
+              // 删除原节点
+              selectedNode.remove();
+              
+              // 导入新节点
+              const importedNodes = await importFigmaJSON(parsedJson);
+              
+              // 将新节点移动到原节点的位置
+              if (importedNodes && importedNodes.length > 0 && originalParent) {
+                const newNode = importedNodes[0];
+                
+                // 如果原节点有索引，将新节点移动到相同位置
+                if (originalIndex !== -1) {
+                  // 先将节点添加到父节点（如果还没有）
+                  if (newNode.parent !== originalParent) {
+                    originalParent.appendChild(newNode);
+                  }
+                  
+                  // 移动到原来的索引位置
+                  if (originalParent.children.length > originalIndex) {
+                    originalParent.insertChild(originalIndex, newNode);
+                  }
+                }
+                
+                // 设置位置
+                newNode.x = originalX;
+                newNode.y = originalY;
+                
+                // 存储llmout历史
+                if (data.llmout) {
+                  // 添加当前的query和llmout到历史记录
+                  existingHistoryArray.push([queryWithPrefix, data.llmout]);
+                  
+                  // 将历史记录JSON字符串存储到新节点中
+                  const historyJson = JSON.stringify(existingHistoryArray);
+                  newNode.setPluginData('llmOutHistory', historyJson);
+                  
+                  // 打印日志，确认数据已存储
+                  console.log(`[修改组件] 已存储更新的历史记录: ${historyJson}`);
+                  console.log(`[修改组件] 验证存储: ${newNode.getPluginData('llmOutHistory')}`);
+                }
+                
+                // 选中新节点
+                figma.currentPage.selection = [newNode];
+              }
+              
+              // 发送成功消息
+              figma.ui.postMessage({
+                type: "success",
+                source: "modify-component",
+                data: data.llmout || '组件修改成功'
+              });
+            } catch (parseError) {
+              throw new Error('JSON解析错误');
+            }
+          } else {
+            throw new Error(`API返回状态错误: ${data.status}`);
+          }
+        } catch (error: unknown) {
+          console.error('修改组件失败:', error);
+        }
+      })();
     } else if (msg.type === 'export-nodes') {
       const nodes = figma.currentPage.children;
       exportNodes(nodes, msg.optimize).then(async nodesData => {
@@ -316,7 +504,8 @@ const codegenMode = async () => {
   // figma.showUI(__html__, { visible: false });
   await getUserSettings();
 
-  figma.codegen.on("generate", ({ language, node }) => {
+  figma.codegen.on("generate", (event) => {
+    const { language, node } = event;
     const convertedSelection = convertIntoNodes([node], null);
 
     switch (language) {
