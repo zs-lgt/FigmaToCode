@@ -244,10 +244,9 @@ const standardMode = async () => {
               
               // 将query和llmout作为一对数据存储到节点信息中
               if (importedNodes && importedNodes.length > 0 && data.llmout) {
-                for (const node of importedNodes) {
-                  // 存储历史记录
-                  storeHistoryData(node, msg.query, data.llmout);
-                }
+                // 只在最外层节点上存储历史记录
+                const topLevelNode = importedNodes[0];
+                storeHistoryData(topLevelNode, msg.query, data.llmout);
               }
               
               // 发送成功消息
@@ -277,7 +276,14 @@ const standardMode = async () => {
           }
           
           // 只取第一个选中的节点
-          const selectedNode = selection[0];
+          let selectedNode = selection[0];
+          
+          // 获取最外层节点（如果选中的是内部节点）
+          const topLevelNode = getTopLevelNode(selectedNode);
+          if (topLevelNode !== selectedNode) {
+            console.log(`[修改组件] 选中的是内部节点，将使用最外层节点: ${topLevelNode.name}`);
+            selectedNode = topLevelNode;
+          }
           
           // 获取节点的历史上下文
           const historyArray = getHistoryData(selectedNode);
@@ -330,7 +336,7 @@ const standardMode = async () => {
                 
                 // 存储llmout历史
                 if (data.llmout) {
-                  // 存储历史记录
+                  // 存储历史记录到最外层节点
                   storeHistoryData(newNode, queryWithPrefix, data.llmout, existingHistoryArray);
                 }
                 
@@ -555,19 +561,50 @@ const callNL2FigmaAPI = async (query: string, history: any[] = [], traceId: stri
   return await response.json();
 };
 
-// 存储历史记录的通用方法
+// 获取节点的最外层父节点（组件或实例）
+const getTopLevelNode = (node: SceneNode): SceneNode => {
+  // 如果节点没有父节点或父节点是页面，则返回节点本身
+  if (!node.parent || node.parent.type === 'PAGE') {
+    return node;
+  }
+  
+  // 如果父节点是组件或组件实例，则返回父节点
+  if (node.parent.type === 'COMPONENT' || node.parent.type === 'INSTANCE') {
+    return node.parent as SceneNode;
+  }
+  
+  // 递归查找最外层父节点
+  if ('parent' in node.parent) {
+    return getTopLevelNode(node.parent as SceneNode);
+  }
+  
+  return node;
+};
+
+// 存储历史记录的通用方法 - 修改为总是存储在最外层节点
 const storeHistoryData = (node: SceneNode, query: string, llmout: string, existingHistory: any[] = []) => {
   try {
+    // 获取最外层节点
+    const topLevelNode = getTopLevelNode(node);
+    
+    // 如果找到了最外层节点，则从该节点获取现有历史记录
+    if (topLevelNode !== node) {
+      const topLevelHistory = getHistoryData(topLevelNode);
+      if (topLevelHistory.length > 0) {
+        existingHistory = topLevelHistory;
+      }
+    }
+    
     // 添加当前的query和llmout到历史记录
     const updatedHistory = [...existingHistory, [query, llmout]];
     
-    // 将历史记录JSON字符串存储到节点中
+    // 将历史记录JSON字符串存储到最外层节点中
     const historyJson = JSON.stringify(updatedHistory);
-    node.setPluginData('llmOutHistory', historyJson);
+    topLevelNode.setPluginData('llmOutHistory', historyJson);
     
     // 打印日志，确认数据已存储
-    console.log(`[历史记录] 已存储历史记录: ${historyJson}`);
-    console.log(`[历史记录] 验证存储: ${node.getPluginData('llmOutHistory')}`);
+    console.log(`[历史记录] 已存储历史记录到最外层节点(${topLevelNode.name}): ${historyJson}`);
+    console.log(`[历史记录] 验证存储: ${topLevelNode.getPluginData('llmOutHistory')}`);
     
     return updatedHistory;
   } catch (error) {
@@ -576,10 +613,13 @@ const storeHistoryData = (node: SceneNode, query: string, llmout: string, existi
   }
 };
 
-// 获取历史记录的通用方法
+// 获取历史记录的通用方法 - 修改为从最外层节点获取
 const getHistoryData = (node: SceneNode) => {
-  const historyStr = node.getPluginData('llmOutHistory') || '';
-  console.log(`[历史记录] 获取到历史记录: ${historyStr}`);
+  // 获取最外层节点
+  const topLevelNode = getTopLevelNode(node);
+  
+  const historyStr = topLevelNode.getPluginData('llmOutHistory') || '';
+  console.log(`[历史记录] 从最外层节点(${topLevelNode.name})获取历史记录: ${historyStr}`);
   
   let historyArray = [];
   if (historyStr) {
