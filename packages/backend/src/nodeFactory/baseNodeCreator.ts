@@ -22,29 +22,6 @@ export class BaseNodeCreator implements NodeCreator {
     if ('layoutMode' in node && data.layoutMode) {
       console.log(`[${node.name}] Setting layoutMode:`, data.layoutMode);
       node.layoutMode = data.layoutMode;
-      
-      // If this is a parent node with layoutMode, ensure it's fully set up
-      if ('primaryAxisSizingMode' in node && data.primaryAxisSizingMode) {
-        node.primaryAxisSizingMode = data.primaryAxisSizingMode;
-      }
-      if ('counterAxisSizingMode' in node && data.counterAxisSizingMode) {
-        node.counterAxisSizingMode = data.counterAxisSizingMode;
-      }
-      if ('primaryAxisAlignItems' in node && data.primaryAxisAlignItems) {
-        node.primaryAxisAlignItems = data.primaryAxisAlignItems;
-      }
-      if ('counterAxisAlignItems' in node && data.counterAxisAlignItems) {
-        node.counterAxisAlignItems = data.counterAxisAlignItems;
-      }
-      if ('paddingLeft' in node && data.padding) {
-        node.paddingLeft = data.padding;
-        node.paddingRight = data.padding;
-        node.paddingTop = data.padding;
-        node.paddingBottom = data.padding;
-      }
-      if ('itemSpacing' in node && data.itemSpacing !== undefined) {
-        node.itemSpacing = data.itemSpacing;
-      }
     }
 
     // Set layout align for child nodes
