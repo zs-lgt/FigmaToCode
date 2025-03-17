@@ -271,10 +271,10 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
       }
 
       // 在所有子节点处理完后，如果当前节点是FRAME并且需要设置layoutSizing，再设置它
-      if (node && nodeData.type === 'FRAME' && (nodeData.layoutSizingHorizontal || nodeData.layoutSizingVertical)) {
+      if (node && (nodeData.layoutSizingHorizontal || nodeData.layoutSizingVertical)) {
         try {
-          const nodeInfo = figma.getNodeById(node.id) as FrameNode;
-          if (nodeInfo && nodeInfo.type === 'FRAME') {
+          const nodeInfo = figma.getNodeById(node.id);
+          if (nodeInfo) {
             if (nodeData.layoutSizingHorizontal) {
               nodeInfo.layoutSizingHorizontal = nodeData.layoutSizingHorizontal;
             }
