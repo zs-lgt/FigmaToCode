@@ -16,20 +16,19 @@ export class BaseNodeCreator implements NodeCreator {
     if (data.name) node.name = data.name;
     if (data.visible !== undefined) node.visible = data.visible;
     if (data.locked !== undefined) node.locked = data.locked;
-    if (data.opacity !== undefined) node.opacity = data.opacity;
+    if ('opacity' in node && data.opacity !== undefined) {
+      (node as any).opacity = data.opacity;
+    }
     
     // Set layout mode first - this is critical for parent nodes
     if ('layoutMode' in node && data.layoutMode) {
-      console.log(`[${node.name}] Setting layoutMode:`, data.layoutMode);
       node.layoutMode = data.layoutMode;
     }
 
     // Set layout align for child nodes
     if ('layoutAlign' in node && data.layoutAlign) {
-      console.log(`[${node.name}] Setting layoutAlign:`, data.layoutAlign);
       node.layoutAlign = data.layoutAlign;
     }
-
 
     // Check if node supports layout sizing and either has layoutMode or parent has layoutMode
     if ('layoutSizingHorizontal' in node && 'layoutSizingVertical' in node) {
@@ -54,11 +53,9 @@ export class BaseNodeCreator implements NodeCreator {
       
       if (hasAutoLayout && node.type !== 'FRAME') {
         if (data.layoutSizingHorizontal) {
-          console.log(`[${node.name}] Setting layoutSizingHorizontal:`, data.layoutSizingHorizontal);
           node.layoutSizingHorizontal = data.layoutSizingHorizontal;
         }
         if (data.layoutSizingVertical) {
-          console.log(`[${node.name}] Setting layoutSizingVertical:`, data.layoutSizingVertical);
           node.layoutSizingVertical = data.layoutSizingVertical;
         }
       }
@@ -143,9 +140,6 @@ export class BaseNodeCreator implements NodeCreator {
   setAppearance(node: SceneNode, data: any) {
     // Set fills
     if ('fills' in node && data.fills) {
-      if (node.type === 'RECTANGLE') {
-        console.log('aaaa', node.name, data);
-      }
       try {
         node.fills = this.processFills(data.fills);
       } catch (error) {
@@ -204,19 +198,27 @@ export class BaseNodeCreator implements NodeCreator {
 
     // Set corner radius for shapes that support it
     if ('cornerRadius' in node) {
-      if (data.cornerRadius !== undefined) {
-        node.cornerRadius = data.cornerRadius;
-      } else if (data.topLeftRadius !== undefined) {
-        // Handle individual corner radii
-        node.topLeftRadius = data.topLeftRadius;
-        node.topRightRadius = data.topRightRadius;
-        node.bottomLeftRadius = data.bottomLeftRadius;
-        node.bottomRightRadius = data.bottomRightRadius;
+      try {
+        if (data.cornerRadius !== undefined) {
+          (node as any).cornerRadius = data.cornerRadius;
+        } else if (data.topLeftRadius !== undefined && 
+                   'topLeftRadius' in node &&
+                   'topRightRadius' in node &&
+                   'bottomLeftRadius' in node &&
+                   'bottomRightRadius' in node) {
+          // Handle individual corner radii
+          (node as any).topLeftRadius = data.topLeftRadius;
+          (node as any).topRightRadius = data.topRightRadius;
+          (node as any).bottomLeftRadius = data.bottomLeftRadius;
+          (node as any).bottomRightRadius = data.bottomRightRadius;
+        }
+      } catch (error) {
+        console.warn(`Failed to set corner radius for ${node.name}:`, error);
       }
     }
   }
 
-  private processFills(fills: any[]): Paint[] {
+  protected processFills(fills: any[]): Paint[] {
     return fills.map(fill => {
       switch (fill.type) {
         case 'SOLID':

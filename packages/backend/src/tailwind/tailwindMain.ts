@@ -21,14 +21,12 @@ export const tailwindMain = async (
 ) => {
   localTailwindSettings = settings;
   previousExecutionCache = [];
-  console.log('tailwind', sceneNode);
   let result = await tailwindWidgetGenerator(sceneNode, settings);
 
   // remove the initial \n that is made in Container.
   if (result.length > 0 && result.startsWith("\n")) {
     result = result.slice(1, result.length);
   }
-  console.log('tailwind', result);
   return result;
 };
 

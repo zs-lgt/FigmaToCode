@@ -281,7 +281,6 @@ const standardMode = async () => {
           // 获取最外层节点（如果选中的是内部节点）
           const topLevelNode = getTopLevelNode(selectedNode);
           if (topLevelNode !== selectedNode) {
-            console.log(`[修改组件] 选中的是内部节点，将使用最外层节点: ${topLevelNode.name}`);
             selectedNode = topLevelNode;
           }
           
@@ -463,7 +462,6 @@ const codegenMode = async () => {
         ];
       case "tailwind":
       case "tailwind_jsx":
-        console.log(11111, convertedSelection, userPluginSettings);
         return [
           {
             title: `Code`,
@@ -602,10 +600,6 @@ const storeHistoryData = (node: SceneNode, query: string, llmout: string, existi
     const historyJson = JSON.stringify(updatedHistory);
     topLevelNode.setPluginData('llmOutHistory', historyJson);
     
-    // 打印日志，确认数据已存储
-    console.log(`[历史记录] 已存储历史记录到最外层节点(${topLevelNode.name}): ${historyJson}`);
-    console.log(`[历史记录] 验证存储: ${topLevelNode.getPluginData('llmOutHistory')}`);
-    
     return updatedHistory;
   } catch (error) {
     console.error('存储历史记录失败:', error);
@@ -619,20 +613,17 @@ const getHistoryData = (node: SceneNode) => {
   const topLevelNode = getTopLevelNode(node);
   
   const historyStr = topLevelNode.getPluginData('llmOutHistory') || '';
-  console.log(`[历史记录] 从最外层节点(${topLevelNode.name})获取历史记录: ${historyStr}`);
   
   let historyArray = [];
   if (historyStr) {
     try {
       // 尝试解析已存储的JSON历史记录
       historyArray = JSON.parse(historyStr);
-      console.log(`[历史记录] 解析历史记录成功: `, historyArray);
     } catch (error) {
       // 如果解析失败，可能是旧格式，创建一个新的历史记录
       console.warn('解析历史记录失败，创建新的历史记录');
       // 旧格式是直接存储的llmout，将其作为没有query的历史记录
       historyArray = [["", historyStr]];
-      console.log(`[历史记录] 使用旧格式历史记录: `, historyArray);
     }
   }
   

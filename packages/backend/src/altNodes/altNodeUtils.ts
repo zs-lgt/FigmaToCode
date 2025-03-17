@@ -47,16 +47,11 @@ export const renderNodeAsSVG = async (node: SceneNode) =>
 
 export const renderAndAttachSVG = async (node: SceneNode) => {
   const altNode = node as AltNode<typeof node>;
-  // const nodeName = `${node.type}:${node.id}`;
-  // console.log(altNode);
   if (altNode.canBeFlattened) {
     if (altNode.svg) {
-      // console.log(`SVG already rendered for ${nodeName}`);
       return altNode;
     }
-    // console.log(`${nodeName} can be flattened!`);
     const svg = await renderNodeAsSVG(altNode.originalNode);
-    // console.log(`${svg}`);
     altNode.svg = svg;
   }
   return altNode;

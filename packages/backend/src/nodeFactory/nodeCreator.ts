@@ -1,4 +1,7 @@
 import { BaseNodeCreator } from "./baseNodeCreator";
+// 导入字体缓存和替换函数
+import { loadedFonts, getFallbackFont } from '../importFigma';
+
 // 文本节点
 export class TextNodeCreator extends BaseNodeCreator {
   async createNode(data: any): Promise<SceneNode | null> {
@@ -6,13 +9,7 @@ export class TextNodeCreator extends BaseNodeCreator {
     this.setBaseProperties(node, data);
     
     try {
-      // 1. First load the default Inter font
-      await figma.loadFontAsync({ family: "Inter", style: "Regular" });
-      
-      // 2. 加载自定义字体
-      const loadedFont = await this.loadFont(data);
-      
-      // 3. 写入文本（现在可以安全地写入，因为默认字体已加载）
+      // 3. 写入文本（现在可以安全地写入，因为字体已在预加载阶段加载）
       if (data.characters) {
         node.characters = data.characters;
       }
@@ -44,74 +41,31 @@ export class TextNodeCreator extends BaseNodeCreator {
         fontName = { family: "Inter", style: "Regular" };
       }
 
-      // Get available fonts
-      const availableFonts = await figma.listAvailableFontsAsync();
+      // 检查字体是否已加载
+      const fontKey = `${fontName.family}:${fontName.style}`;
+      if (loadedFonts.has(fontKey)) {
+        return fontName;
+      }
+
+      // 如果字体未加载，尝试获取替代字体
+      const fallback = getFallbackFont(fontName.family, fontName.style);
+      const fallbackKey = `${fallback.family}:${fallback.style}`;
       
-      // Try to find exact match first
-      let matchedFont = availableFonts.find(font => 
-        font.fontName.family === fontName.family && 
-        font.fontName.style === fontName.style
-      );
-
-      // If no exact match, try to find a similar font
-      if (!matchedFont && fontName.family.includes("SF Pro")) {
-        // Try variations of SF Pro font names
-        const sfProVariants = ["SF Pro", "SF Pro Text", "SF Pro Display"];
-        for (const variant of sfProVariants) {
-          matchedFont = availableFonts.find(font =>
-            font.fontName.family === variant &&
-            font.fontName.style === fontName.style
-          );
-          if (matchedFont) break;
-        }
-
-        // If still no match, try to match style
-        if (!matchedFont) {
-          // Map common style names
-          const styleMap: { [key: string]: string[] } = {
-            "Semibold": ["SemiBold", "Semi Bold", "Medium"],
-            "Medium": ["Medium", "Regular"],
-            "Bold": ["Bold", "Heavy"],
-            "Regular": ["Regular", "Normal"]
-          };
-
-          const targetStyle = fontName.style;
-          const alternativeStyles = styleMap[targetStyle] || [targetStyle];
-
-          for (const variant of sfProVariants) {
-            for (const style of alternativeStyles) {
-              matchedFont = availableFonts.find(font =>
-                font.fontName.family === variant &&
-                font.fontName.style === style
-              );
-              if (matchedFont) break;
-            }
-            if (matchedFont) break;
-          }
-        }
+      // 如果替代字体也未加载，加载它
+      if (!loadedFonts.has(fallbackKey)) {
+        await figma.loadFontAsync(fallback);
+        loadedFonts.add(fallbackKey);
       }
-
-      // If we found a matching font, try to load it
-      if (matchedFont) {
-        try {
-          await figma.loadFontAsync(matchedFont.fontName);
-          return matchedFont.fontName;
-        } catch (error) {
-          console.warn(`Failed to load matched font ${matchedFont.fontName.family} ${matchedFont.fontName.style}, falling back to Inter:`, error);
-        }
-      } else {
-        console.warn(`No matching font found for ${fontName.family} ${fontName.style}, falling back to Inter`);
-      }
-
-      // Fallback to Inter
-      const fallbackFont = { family: "Inter", style: "Regular" };
-      await figma.loadFontAsync(fallbackFont);
-      return fallbackFont;
-
+      
+      return fallback;
     } catch (error) {
       console.warn('Font loading error, falling back to Inter:', error);
       const fallbackFont = { family: "Inter", style: "Regular" };
-      await figma.loadFontAsync(fallbackFont);
+      // 检查默认字体是否已加载
+      if (!loadedFonts.has('Inter:Regular')) {
+        await figma.loadFontAsync(fallbackFont);
+        loadedFonts.add('Inter:Regular');
+      }
       return fallbackFont;
     }
   }
@@ -278,10 +232,6 @@ export class FrameNodeCreator extends BaseNodeCreator {
         if (node.parent) {
           const nodeInfo = figma.getNodeById(node.id);
           if (nodeInfo && nodeInfo.type === 'FRAME') {
-            console.log(`[${node.name}] Setting layoutSizing through nodeInfo:`, {
-              horizontal: data.layoutSizingHorizontal,
-              vertical: data.layoutSizingVertical
-            });
             
             if (data.layoutSizingHorizontal) {
               nodeInfo.layoutSizingHorizontal = data.layoutSizingHorizontal;
@@ -314,7 +264,6 @@ export class RectangleNodeCreator extends BaseNodeCreator {
     }
     
     this.setAppearance(node, data);
-    console.log(node.name, node);
     return node;
   }
 }
@@ -322,8 +271,9 @@ export class RectangleNodeCreator extends BaseNodeCreator {
 // Group node creator
 export class GroupNodeCreator extends BaseNodeCreator {
   async createNode(data: any): Promise<SceneNode | null> {
-    // Create a temporary frame that will be converted to group after children are added
+    // Figma API不允许直接创建Group，只能先创建Frame，然后在子节点添加后转换为Group
     const node = figma.createFrame();
+    
     this.setBaseProperties(node, data);
     
     // Groups don't have fills

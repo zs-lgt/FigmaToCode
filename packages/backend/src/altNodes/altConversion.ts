@@ -59,10 +59,6 @@ export const convertNodeToAltNode =
       case "TEXT":
         // @ts-ignore
         globalTextStyleSegments[node.id] = extractStyledTextSegments(node);
-        console.log(
-          "globalTextStyleSegments",
-          globalTextStyleSegments[node.id],
-        );
         return cloneNode(node, parent);
 
       // Unsupported Nodes
@@ -149,7 +145,6 @@ const extractStyledTextSegments = (node: TextNode) => {
     "openTypeFeatures",
   ]);
   // @ts-ignore
-  console.log("extractStyledTextSegments", node, segments, getStyledTextSegments(node));
   return getStyledTextSegments(node);
 }
 
