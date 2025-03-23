@@ -270,7 +270,7 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
         }
       }
 
-      // 在所有子节点处理完后，如果当前节点是FRAME并且需要设置layoutSizing，再设置它
+      // 在所有子节点处理完后，如果当前节点是FRAME并且需要设置layout相关属性，再设置它
       if (node && (nodeData.layoutSizingHorizontal || nodeData.layoutSizingVertical)) {
         try {
           const nodeInfo = figma.getNodeById(node.id);
@@ -280,6 +280,12 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
             }
             if (nodeData.layoutSizingVertical) {
               nodeInfo.layoutSizingVertical = nodeData.layoutSizingVertical;
+            }
+            if (nodeData.layoutPositioning) {
+              nodeInfo.layoutPositioning = nodeData.layoutPositioning;
+              nodeInfo.x = nodeData.x;
+              nodeInfo.y = nodeData.y;
+
             }
           }
         } catch (error) {
