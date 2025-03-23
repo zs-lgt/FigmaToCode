@@ -285,7 +285,9 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
               nodeInfo.layoutPositioning = nodeData.layoutPositioning;
               nodeInfo.x = nodeData.x;
               nodeInfo.y = nodeData.y;
-
+            }
+            if (nodeData.counterAxisSpacing) {
+              nodeInfo.counterAxisSpacing = nodeData.counterAxisSpacing;
             }
           }
         } catch (error) {

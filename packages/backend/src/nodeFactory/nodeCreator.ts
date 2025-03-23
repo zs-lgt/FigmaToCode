@@ -208,6 +208,7 @@ export class FrameNodeCreator extends BaseNodeCreator {
       if (data.counterAxisSizingMode) node.counterAxisSizingMode = data.counterAxisSizingMode;
       if (data.primaryAxisAlignItems) node.primaryAxisAlignItems = data.primaryAxisAlignItems;
       if (data.counterAxisAlignItems) node.counterAxisAlignItems = data.counterAxisAlignItems;
+      if (data.layoutWrap !== undefined) node.layoutWrap = data.layoutWrap;
       if (data.itemSpacing !== undefined) node.itemSpacing = data.itemSpacing;
     }
 
@@ -308,6 +309,7 @@ export class InstanceNodeCreator extends BaseNodeCreator {
       if (data.counterAxisSizingMode) node.counterAxisSizingMode = data.counterAxisSizingMode;
       if (data.primaryAxisAlignItems) node.primaryAxisAlignItems = data.primaryAxisAlignItems;
       if (data.counterAxisAlignItems) node.counterAxisAlignItems = data.counterAxisAlignItems;
+      if (data.layoutWrap !== undefined) node.layoutWrap = data.layoutWrap;
       if (data.paddingLeft) node.paddingLeft = data.paddingLeft;
       if (data.paddingRight) node.paddingRight = data.paddingRight;
       if (data.paddingTop) node.paddingTop = data.paddingTop;
