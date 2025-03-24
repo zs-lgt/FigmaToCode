@@ -256,6 +256,42 @@ export class BaseNodeCreator implements NodeCreator {
           };
 
         case 'IMAGE':
+          // 如果有base64图片数据，先创建图片，再返回填充
+          if (fill.imageBase64) {
+            try {
+              // 从base64创建图片
+              const imageData = fill.imageBase64;
+              // 解析mime类型和数据部分
+              const matches = imageData.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.*)$/);
+              
+              if (matches && matches.length === 3) {
+                const mimeType = matches[1];
+                const base64Data = matches[2];
+                
+                // 解码base64
+                const imageBytes = figma.base64Decode(base64Data);
+                
+                // 创建新图片
+                const image = figma.createImage(imageBytes);
+                
+                // 返回使用新创建图片的填充
+                return {
+                  type: 'IMAGE',
+                  visible: fill.visible !== undefined ? fill.visible : true,
+                  imageHash: image.hash,
+                  scaleMode: fill.scaleMode || 'FILL',
+                  opacity: fill.opacity !== undefined ? fill.opacity : 1,
+                  blendMode: fill.blendMode || 'NORMAL',
+                  imageTransform: fill.imageTransform || [[1, 0, 0], [0, 1, 0]]
+                };
+              }
+            } catch (error) {
+              console.warn('Failed to create image from base64:', error);
+              // 如果失败，尝试使用原始imageHash
+            }
+          }
+          
+          // 使用原始imageHash（如果base64处理失败或没有base64数据）
           return {
             type: 'IMAGE',
             visible: fill.visible !== undefined ? fill.visible : true,

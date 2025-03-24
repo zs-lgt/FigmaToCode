@@ -4,12 +4,13 @@ import {
   filterHashNodes,
   getNodeExportImage,
   cleanExportData,
+  processNodeImageFills,
 } from './exportNode';
 
 export { getNodeExportImage };
 
 // 递归处理节点及其子节点
-const processNode = async (node: SceneNode) => {
+const processNode = async (node: SceneNode, imageDataMap: Map<string, string> = new Map()) => {
   // 如果是INSTANCE节点，返回简化信息
   if (node.type === 'INSTANCE') {
     const instanceNode = node as InstanceNode;
@@ -33,21 +34,62 @@ const processNode = async (node: SceneNode) => {
   // 如果节点有子节点，递归处理
   if ('children' in node && node.children) {
     const processedNode = getNodeInfo(node);
+    
+    // 处理节点中的图片填充，加入base64数据
+    if (processedNode.fills) {
+      processedNode.fills = processedNode.fills.map((fill: any) => {
+        if (fill.type === 'IMAGE' && fill.imageHash && imageDataMap.has(fill.imageHash)) {
+          return {
+            ...fill,
+            imageBase64: imageDataMap.get(fill.imageHash)
+          };
+        }
+        return fill;
+      });
+    }
+    
     // 等待所有子节点处理完成
     processedNode.children = await Promise.all(
-      node.children.map(child => processNode(child))
+      node.children.map(child => processNode(child, imageDataMap))
     );
     return processedNode;
   }
 
   // 其他类型节点直接返回完整信息
-  return getNodeInfo(node);
+  const processedNode = getNodeInfo(node);
+  
+  // 处理节点中的图片填充，加入base64数据
+  if (processedNode.fills) {
+    processedNode.fills = processedNode.fills.map((fill: any) => {
+      if (fill.type === 'IMAGE' && fill.imageHash && imageDataMap.has(fill.imageHash)) {
+        return {
+          ...fill,
+          imageBase64: imageDataMap.get(fill.imageHash)
+        };
+      }
+      return fill;
+    });
+  }
+  
+  return processedNode;
 };
 
 export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean, filterSymbols: boolean = true) => {
   let description = '';
   const exportedNodes = [];
   const exportedImages = [];
+  
+  // 收集所有节点中的图片填充数据
+  const imageDataMap = new Map<string, string>();
+  for (const node of nodes) {
+    const nodeImageMap = await processNodeImageFills(node);
+    // 合并图片数据
+    nodeImageMap.forEach((value, key) => {
+      if (!imageDataMap.has(key)) {
+        imageDataMap.set(key, value);
+      }
+    });
+  }
 
   // 处理所有节点
   for (const node of nodes) {
@@ -63,8 +105,8 @@ export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean
         continue;
       }
 
-      // 处理节点及其子节点
-      const processedNode = await processNode(node);
+      // 处理节点及其子节点，同时传入图片数据映射
+      const processedNode = await processNode(node, imageDataMap);
       if (processedNode) {
         exportedNodes.push(optimize ? cleanExportData(processedNode) : processedNode);
         exportedImages.push({
@@ -82,5 +124,7 @@ export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean
     description,
     images: exportedImages,
     optimize,
+    // 输出图片hash到base64的映射，以便在导入时使用
+    imageData: Object.fromEntries(imageDataMap)
   }
 }

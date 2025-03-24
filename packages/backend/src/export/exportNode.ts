@@ -5,7 +5,7 @@ export const ESSENTIAL_PROPERTIES = {
   text: ['characters', 'fontSize', 'fontName', 'textAlignHorizontal', 'textAutoResize', 'textCase', 'textDecoration', 'letterSpacing', 'lineHeight'],
   style: ['fills', 'strokes', 'effects', 'cornerRadius', 'strokeWeight'],
   constraints: ['constraints'],
-  image: ['imageHash']
+  image: ['imageHash', 'imageBase64', 'imageRef']
 };
 
 export const cleanExportData = (obj: any): any => {
@@ -152,7 +152,34 @@ export const getNodeInfo = (node: SceneNode) => {
   }
 
   // 样式属性
-  if ('fills' in node) nodeInfo.fills = node.fills;
+  if ('fills' in node && node.fills) {
+    // 处理填充属性，特别关注图片填充
+    const fills = node.fills as readonly Paint[];
+    if (Array.isArray(fills)) {
+      nodeInfo.fills = fills.map((fill: Paint) => {
+        // 如果是图片填充，获取图片数据
+        if (fill.type === 'IMAGE' && 'imageHash' in fill && fill.imageHash) {
+          // 克隆填充属性
+          const imageFill = { ...fill } as any;
+          
+          // 尝试获取图片数据并转为base64
+          try {
+            // 保存图片的访问地址，下次导入时可以通过地址取回图片
+            imageFill.imageRef = `figma://image/${fill.imageHash}`;
+            // 保留原始imageHash用于文档内部引用
+            imageFill.imageHash = fill.imageHash;
+          } catch (error) {
+            console.warn('Error processing image fill:', error);
+          }
+          
+          return imageFill;
+        }
+        return fill;
+      });
+    } else {
+      nodeInfo.fills = fills;
+    }
+  }
   if ('strokes' in node) nodeInfo.strokes = node.strokes;
   if ('strokeWeight' in node) nodeInfo.strokeWeight = node.strokeWeight;
   if ('strokeAlign' in node) nodeInfo.strokeAlign = node.strokeAlign;
@@ -258,4 +285,72 @@ export const getNodeExportImage = async (nodeId: string) => {
     console.error('Error exporting node:', error);
     return null;
   }
+};
+
+/**
+ * 获取图片填充的base64数据
+ * @param imageHash - 图片的hash值
+ * @returns 图片的base64编码
+ */
+export const getImageFillData = async (imageHash: string): Promise<string | null> => {
+  try {
+    // 从Figma图片API获取图片数据
+    const image = figma.getImageByHash(imageHash);
+    if (!image) return null;
+    
+    // 获取图片字节数据
+    const bytes = await image.getBytesAsync();
+    
+    // 尝试确定图片格式（基于经验，大多数是PNG）
+    const format = 'png';
+    
+    // 转换为base64
+    const base64String = figma.base64Encode(bytes);
+    return `data:image/${format};base64,${base64String}`;
+  } catch (error) {
+    console.error('Error getting image fill data:', error);
+    return null;
+  }
+};
+
+/**
+ * 处理节点中的所有图片填充
+ * @param node - 节点
+ * @returns 包含所有图片填充hash和base64数据的映射
+ */
+export const processNodeImageFills = async (node: SceneNode): Promise<Map<string, string>> => {
+  const imageMap = new Map<string, string>();
+  
+  // 处理节点自身的填充
+  if ('fills' in node && node.fills) {
+    const fills = node.fills as readonly Paint[];
+    if (Array.isArray(fills)) {
+      for (const fill of fills) {
+        if (fill.type === 'IMAGE' && 'imageHash' in fill && fill.imageHash) {
+          // 如果这个hash还没有处理过
+          if (!imageMap.has(fill.imageHash)) {
+            const base64Data = await getImageFillData(fill.imageHash);
+            if (base64Data) {
+              imageMap.set(fill.imageHash, base64Data);
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // 递归处理子节点
+  if ('children' in node) {
+    for (const child of node.children) {
+      const childImageMap = await processNodeImageFills(child);
+      // 合并子节点的图片映射
+      childImageMap.forEach((value, key) => {
+        if (!imageMap.has(key)) {
+          imageMap.set(key, value);
+        }
+      });
+    }
+  }
+  
+  return imageMap;
 };
