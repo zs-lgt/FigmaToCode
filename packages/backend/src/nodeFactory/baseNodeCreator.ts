@@ -20,6 +20,23 @@ export class BaseNodeCreator implements NodeCreator {
       (node as any).opacity = data.opacity;
     }
     
+    // 设置constrainProportions属性
+    if ('constrainProportions' in node && data.constrainProportions !== undefined) {
+      // 检查节点类型是否支持constrainProportions
+      if (node.type === 'RECTANGLE' || 
+          node.type === 'ELLIPSE' || 
+          node.type === 'POLYGON' || 
+          node.type === 'STAR' || 
+          node.type === 'VECTOR' || 
+          node.type === 'LINE' || 
+          node.type === 'FRAME' ||
+          node.type === 'COMPONENT' ||
+          node.type === 'INSTANCE' ||
+          node.type === 'BOOLEAN_OPERATION') {
+        (node as FrameNode | RectangleNode | EllipseNode | PolygonNode | StarNode | VectorNode | LineNode | BooleanOperationNode).constrainProportions = data.constrainProportions;
+      }
+    }
+    
     // Set layout mode first - this is critical for parent nodes
     if ('layoutMode' in node && data.layoutMode) {
       node.layoutMode = data.layoutMode;

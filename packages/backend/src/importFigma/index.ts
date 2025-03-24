@@ -270,7 +270,7 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
         }
       }
 
-      // 在所有子节点处理完后，如果当前节点是FRAME并且需要设置layout相关属性，再设置它
+      // 在所有子节点处理完后，如果当前节点需要设置layout相关属性，再设置它
       if (node && (nodeData.layoutSizingHorizontal || nodeData.layoutSizingVertical)) {
         try {
           const nodeInfo = figma.getNodeById(node.id);
