@@ -134,6 +134,7 @@ export const PluginUI = (props: PluginUIProps) => {
   const [modalMessage, setModalMessage] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showUxImportModal, setShowUxImportModal] = useState(false);
 
   // 处理插件消息
   useEffect(() => {
@@ -427,7 +428,72 @@ export const PluginUI = (props: PluginUIProps) => {
           >
             修改组件
           </button>
+          <button
+            onClick={() => setShowUxImportModal(true)}
+            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            导入UX
+          </button>
         </div>
+
+        {/* UX Import Modal */}
+        {showUxImportModal && (
+          <div className="fixed inset-0 z-10 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+              </div>
+              <div className="inline-block px-4 pt-5 pb-4 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+                <div>
+                  <h3 className="text-lg font-medium leading-6 text-gray-900">导入UX交互信息</h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500">请选择UX交互信息的JSON文件</p>
+                  </div>
+                  <div className="mt-4">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            try {
+                              const jsonData = JSON.parse(event.target?.result as string);
+                              window.parent.postMessage(
+                                { 
+                                  pluginMessage: { 
+                                    type: 'import-ux-info',
+                                    data: jsonData
+                                  } 
+                                },
+                                "*"
+                              );
+                              setShowUxImportModal(false);
+                            } catch (error) {
+                              alert('无效的JSON文件');
+                            }
+                          };
+                          reader.readAsText(file);
+                        }
+                      }}
+                      className="w-full p-2 mt-1 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                </div>
+                <div className="mt-5 sm:mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowUxImportModal(false)}
+                    className="inline-flex justify-center w-full px-4 py-2 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* UI JSON Import Modal */}

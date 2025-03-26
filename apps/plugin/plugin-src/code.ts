@@ -14,6 +14,8 @@ import { htmlCodeGenTextStyles } from "backend/src/html/htmlMain";
 import { swiftUICodeGenTextStyles } from "backend/src/swiftui/swiftuiMain";
 import { exportNodes, getNodeExportImage } from 'backend/src/export';
 import { importFigmaJSON } from 'backend/src/importFigma';
+import { TextAnnotation } from './annotations/text';
+import { UXInfoAnnotationManager } from './annotations/uxInfoAnnotation';
 
 let userPluginSettings: PluginSettings;
 let isCodeGenerationEnabled = true;  // 添加代码生成状态控制
@@ -133,7 +135,7 @@ const standardMode = async () => {
     sendSelectedNodeInfo();
   });
 
-  figma.ui.on('message', (msg) => {
+  figma.ui.on('message', async (msg) => {
     if (msg.type === "get-code-gen-state") {
       figma.ui.postMessage({
         type: "code-gen-state",
@@ -152,6 +154,15 @@ const standardMode = async () => {
       } else {
         // 重新生成代码
         safeRun(userPluginSettings);
+      }
+    } else if (msg.type === "import-ux-info") {
+      try {
+        const textAnnotation = new TextAnnotation();
+        const uxManager = new UXInfoAnnotationManager(textAnnotation);
+        await uxManager.processUXInfo(msg.data);
+        sendResultMessage(true, 'ux-import', '导入UX交互信息成功');
+      } catch (error: any) {
+        sendResultMessage(false, 'ux-import', `导入失败: ${error.message}`);
       }
     } else if (msg.type === "pluginSettingChanged") {
       (userPluginSettings as any)[msg.key] = msg.value;
