@@ -268,12 +268,49 @@ const standardMode = async () => {
           } else {
             throw new Error(`API返回状态错误: ${data.status}`);
           }
-        } catch (error: unknown) {  // 明确指定error类型为unknown
+        } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : '未知错误';
           console.error('生成组件失败:', error);
           sendResultMessage(false, "nl2figma", `生成组件失败: ${errorMessage}`);
         }
-      })();  // 立即执行异步函数
+      })();
+    } else if (msg.type === 'img2figma-generate') {
+      (async () => {  // 使用立即执行的异步函数
+        try {
+          if (!msg.img_base64) {
+            throw new Error('没有提供图片数据');
+          }
+          
+          // 调用与文生组件相同的API，但使用不同的参数
+          const data = await callImg2FigmaAPI(msg.img_base64);
+          
+          if (data.status === 'success' && data.figma_json) {
+            try {
+              const parsedJson = JSON.parse(data.figma_json);
+              // 导入生成的组件
+              const importedNodes = await importFigmaJSON(parsedJson);
+              
+              // 将响应数据作为一对数据存储到节点信息中
+              if (importedNodes && importedNodes.length > 0 && data.llmout) {
+                // 只在最外层节点上存储历史记录
+                const topLevelNode = importedNodes[0];
+                storeHistoryData(topLevelNode, "图片生成组件", data.llmout);
+              }
+              
+              // 发送成功消息
+              sendResultMessage(true, "img2figma", data.llmout || '组件生成成功');
+            } catch (parseError) {
+              throw new Error('JSON解析错误');
+            }
+          } else {
+            throw new Error(`API返回状态错误: ${data.status}`);
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : '未知错误';
+          console.error('图生组件失败:', error);
+          sendResultMessage(false, "img2figma", `图生组件失败: ${errorMessage}`);
+        }
+      })();
     } else if (msg.type === 'check-selection') {
       // 检查是否有选中的节点，并发送选中节点的信息
       sendSelectedNodeInfo();
@@ -435,10 +472,12 @@ const codegenMode = async () => {
   figma.codegen.on("generate", (event) => {
     const { language, node } = event;
     const convertedSelection = convertIntoNodes([node], null);
+    
+    let result: CodegenResult[] = [];
 
     switch (language) {
       case "html":
-        return [
+        result = [
           {
             title: `Code`,
             code: htmlMain(
@@ -454,8 +493,9 @@ const codegenMode = async () => {
             language: "HTML",
           },
         ];
+        break;
       case "html_jsx":
-        return [
+        result = [
           {
             title: `Code`,
             code: htmlMain(
@@ -471,9 +511,10 @@ const codegenMode = async () => {
             language: "HTML",
           },
         ];
+        break;
       case "tailwind":
       case "tailwind_jsx":
-        return [
+        result = [
           {
             title: `Code`,
             code: tailwindMain(convertedSelection, {
@@ -482,11 +523,6 @@ const codegenMode = async () => {
             }),
             language: "HTML",
           },
-          // {
-          //   title: `Style`,
-          //   code: tailwindMain(convertedSelection, defaultPluginSettings),
-          //   language: "HTML",
-          // },
           {
             title: `Tailwind Colors`,
             code: retrieveGenericSolidUIColors("Tailwind")
@@ -509,8 +545,9 @@ const codegenMode = async () => {
             language: "HTML",
           },
         ];
+        break;
       case "flutter":
-        return [
+        result = [
           {
             title: `Code`,
             code: flutterMain(convertedSelection, {
@@ -525,8 +562,9 @@ const codegenMode = async () => {
             language: "SWIFT",
           },
         ];
+        break;
       case "swiftUI":
-        return [
+        result = [
           {
             title: `SwiftUI`,
             code: swiftuiMain(convertedSelection, {
@@ -541,12 +579,13 @@ const codegenMode = async () => {
             language: "SWIFT",
           },
         ];
+        break;
       default:
+        result = [];
         break;
     }
 
-    const blocks: CodegenResult[] = [];
-    return blocks;
+    return result;
   });
 };
 
@@ -559,6 +598,30 @@ const callNL2FigmaAPI = async (query: string, history: any[] = [], traceId: stri
     body: JSON.stringify({
       query,
       history,
+      traceId
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return await response.json();
+};
+
+// 图生组件API
+const callImg2FigmaAPI = async (img_base64: string, traceId: string = '123') => {
+  // 检查并去除base64前缀
+  const base64Data = img_base64.includes('base64,') 
+    ? img_base64.split('base64,')[1]
+    : img_base64;
+    
+  const API_BASE_URL = 'https://occ.10jqka.com.cn/figma2code/webapi_fuzz/v1/nl2figma';
+  const response = await fetch(`${API_BASE_URL}`, {
+    method: 'POST',
+    headers: {},
+    body: JSON.stringify({
+      img_base64: base64Data,
       traceId
     })
   });

@@ -135,41 +135,74 @@ export const PluginUI = (props: PluginUIProps) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showUxImportModal, setShowUxImportModal] = useState(false);
+  const [showImg2FigmaModal, setShowImg2FigmaModal] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // 处理插件消息
   useEffect(() => {
-    const messageHandler = (event: MessageEvent) => {
-      const msg = event.data.pluginMessage;
-      if (msg && msg.type === 'success') {
+    // 处理插件消息
+    const handlePluginMessage = (event: MessageEvent) => {
+      const message = event.data.pluginMessage;
+      if (!message) return;
+
+      // 处理成功消息
+      if (message.type === "success") {
+        // 关闭加载状态
         setIsLoading(false);
-        // 只有文生组件相关的消息才使用 Modal
-        if (msg.source === 'nl2figma' || msg.source === 'modify-component') {
-          setModalMessage(msg.data);
-          setIsModalOpen(true);
-          setModifyComponentInput('');
+        
+        // 处理不同来源的成功消息
+        if (message.source === 'nl2figma') {
+          setShowNL2FigmaModal(false);
           setNl2figmaInput('');
+        } else if (message.source === 'img2figma') {
+          setShowImg2FigmaModal(false);
+          setImagePreview(null);
+        } else if (message.source === 'modify-component') {
+          setShowModifyComponentModal(false);
+          setModifyComponentInput('');
         }
-      } else if (msg && msg.type === 'error') {
-        setIsLoading(false);
-        // 只有文生组件相关的错误才使用 Modal
-        if (msg.source === 'nl2figma' || msg.source === 'modify-component') {
-          setModalMessage(msg.data);
+        
+        // 只有文生组件和图生组件相关的消息才使用 Modal
+        if (message.source === 'nl2figma' || message.source === 'img2figma' || message.source === 'modify-component') {
+          setModalMessage(message.data);
           setIsModalOpen(true);
-          // 即使出错也清空输入框
-          if (msg.source === 'modify-component') {
-            setModifyComponentInput('');
+        }
+      }
+      // 处理错误消息
+      else if (message.type === "error") {
+        // 关闭加载状态
+        setIsLoading(false);
+        
+        // 只有文生组件和图生组件相关的错误才使用 Modal
+        if (message.source === 'nl2figma' || message.source === 'img2figma' || message.source === 'modify-component') {
+          setModalMessage(message.data);
+          setIsModalOpen(true);
+          
+          // 如果是修改组件的错误，留在模态框中
+          if (message.source === 'modify-component') {
+            // 不关闭模态框，让用户可以尝试修改查询
+          } else {
+            // 其他情况关闭相应的模态框
+            if (message.source === 'nl2figma') {
+              setShowNL2FigmaModal(false);
+              setNl2figmaInput('');
+            } else if (message.source === 'img2figma') {
+              setShowImg2FigmaModal(false);
+              setImagePreview(null);
+            }
           }
         } else {
-          // 其他错误消息使用 alert
-          alert(msg.data);
+          // 其他错误直接显示在控制台
+          console.error(message.data);
         }
-      } else if (msg && msg.type === 'selected-node-info') {
+      } else if (message && message.type === 'selected-node-info') {
         // 接收选中节点的信息
-        setSelectedNodeName(msg.name || '');
+        setSelectedNodeName(message.name || '');
       }
     };
-    window.addEventListener('message', messageHandler);
-    return () => window.removeEventListener('message', messageHandler);
+    window.addEventListener('message', handlePluginMessage);
+    return () => window.removeEventListener('message', handlePluginMessage);
   }, []);
 
   useEffect(() => {
@@ -357,6 +390,69 @@ export const PluginUI = (props: PluginUIProps) => {
     }
   };
 
+  // 图生组件处理函数
+  const handleImg2FigmaClick = () => {
+    setShowImg2FigmaModal(true);
+    setImagePreview(null);
+  };
+
+  // 修改handlePaste函数使其可以处理整个模态框的粘贴事件
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile();
+        if (blob) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64 = e.target?.result as string;
+            setImagePreview(base64);
+          };
+          reader.readAsDataURL(blob);
+        }
+        break;
+      }
+    }
+  };
+
+  // 处理文件选择
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setImagePreview(base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // 提交图片生成组件
+  const handleImg2FigmaSubmit = () => {
+    if (!imagePreview) {
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      // 发送消息到插件后端处理API调用
+      window.parent.postMessage(
+        { 
+          pluginMessage: { 
+            type: "img2figma-generate",
+            img_base64: imagePreview
+          } 
+        },
+        "*"
+      );
+    } catch (error: any) {
+      setIsLoading(false);
+      console.error('发送请求失败:', error);
+      alert(`发送请求失败: ${error.message}`);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
@@ -421,6 +517,12 @@ export const PluginUI = (props: PluginUIProps) => {
             className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             文生组件
+          </button>
+          <button
+            onClick={handleImg2FigmaClick}
+            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            图生组件
           </button>
           <button
             onClick={handleModifyComponentClick}
@@ -636,6 +738,100 @@ export const PluginUI = (props: PluginUIProps) => {
                 disabled={isLoading || !selectedNodeName}
               >
                 修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* 图生组件模态框 */}
+      {showImg2FigmaModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" 
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+          onPaste={handlePaste}
+        >
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium dark:text-white">图生组件</h3>
+              {isLoading && (
+                <div className="flex items-center text-sm text-blue-600 dark:text-blue-400">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  生成中...
+                </div>
+              )}
+            </div>
+            
+            <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+              请粘贴或上传图片，将根据图片内容生成组件
+            </div>
+            
+            <div 
+              className="w-full h-64 border-2 border-dashed rounded-md flex flex-col items-center justify-center mb-4 dark:border-gray-600 overflow-hidden"
+            >
+              {imagePreview ? (
+                <div className="w-full h-full relative">
+                  <img 
+                    src={imagePreview} 
+                    alt="预览图" 
+                    className="object-contain w-full h-full"
+                  />
+                  <button 
+                    className="absolute top-2 right-2 bg-gray-800 bg-opacity-70 text-white rounded-full p-1"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setImagePreview(null);
+                    }}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <svg className="w-12 h-12 text-gray-400 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-gray-500 dark:text-gray-400 mb-3">拖放或直接粘贴图片到此处</p>
+                  <button
+                    onClick={() => imageInputRef.current?.click()}
+                    className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                  >
+                    选择图片文件
+                  </button>
+                </>
+              )}
+            </div>
+            
+            <input 
+              type="file" 
+              ref={imageInputRef} 
+              onChange={handleFileChange} 
+              accept="image/*" 
+              className="hidden" 
+            />
+            
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowImg2FigmaModal(false);
+                  setImagePreview(null);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                disabled={isLoading}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleImg2FigmaSubmit}
+                className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center ${isLoading || !imagePreview ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isLoading || !imagePreview}
+              >
+                {isLoading ? '生成中...' : '生成'}
               </button>
             </div>
           </div>
