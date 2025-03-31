@@ -2,6 +2,11 @@ import { BaseNodeCreator } from "./baseNodeCreator";
 // 导入字体缓存和替换函数
 import { loadedFonts, getFallbackFont } from '../importFigma';
 
+// 验证数据类型
+const validateType = (data: any, type: string) => {
+  return typeof data === type;
+}
+
 // 文本节点
 export class TextNodeCreator extends BaseNodeCreator {
   async createNode(data: any): Promise<SceneNode | null> {
@@ -204,24 +209,22 @@ export class FrameNodeCreator extends BaseNodeCreator {
     // Set layout properties
     if (data.layoutMode) {
       node.layoutMode = data.layoutMode;
-      if (data.primaryAxisSizingMode) node.primaryAxisSizingMode = data.primaryAxisSizingMode;
-      if (data.counterAxisSizingMode) node.counterAxisSizingMode = data.counterAxisSizingMode;
-      if (data.primaryAxisAlignItems) node.primaryAxisAlignItems = data.primaryAxisAlignItems;
-      if (data.counterAxisAlignItems) node.counterAxisAlignItems = data.counterAxisAlignItems;
-      if (data.layoutWrap !== undefined) node.layoutWrap = data.layoutWrap;
-      if (data.itemSpacing !== undefined) node.itemSpacing = data.itemSpacing;
+      if (data.primaryAxisSizingMode && validateType(data.primaryAxisSizingMode, 'string')) node.primaryAxisSizingMode = data.primaryAxisSizingMode;
+      if (data.counterAxisSizingMode && validateType(data.counterAxisSizingMode, 'string')) node.counterAxisSizingMode = data.counterAxisSizingMode;
+      if (data.primaryAxisAlignItems && validateType(data.primaryAxisAlignItems, 'string')) node.primaryAxisAlignItems = data.primaryAxisAlignItems;
+      if (data.counterAxisAlignItems && validateType(data.counterAxisAlignItems, 'string')) node.counterAxisAlignItems = data.counterAxisAlignItems;
+      if (data.layoutWrap !== undefined && validateType(data.layoutWrap, 'boolean')) node.layoutWrap = data.layoutWrap;
+      if (data.itemSpacing !== undefined && validateType(data.itemSpacing, 'number')) node.itemSpacing = data.itemSpacing;
     }
 
     // Set padding
-    if (data.paddingLeft !== undefined) node.paddingLeft = data.paddingLeft;
-    if (data.paddingRight !== undefined) node.paddingRight = data.paddingRight;
-    if (data.paddingTop !== undefined) node.paddingTop = data.paddingTop;
-    if (data.paddingBottom !== undefined) node.paddingBottom = data.paddingBottom;
+    if (data.paddingLeft !== undefined && validateType(data.paddingLeft, 'number')) node.paddingLeft = data.paddingLeft;
+    if (data.paddingRight !== undefined && validateType(data.paddingRight, 'number')) node.paddingRight = data.paddingRight;
+    if (data.paddingTop !== undefined && validateType(data.paddingTop, 'number')) node.paddingTop = data.paddingTop;
+    if (data.paddingBottom !== undefined && validateType(data.paddingBottom, 'number')) node.paddingBottom = data.paddingBottom;
 
     // Set clipsContent
-    if (data.clipsContent !== undefined) {
-      node.clipsContent = data.clipsContent;
-    }
+    if (data.clipsContent !== undefined && validateType(data.clipsContent, 'boolean')) node.clipsContent = data.clipsContent;
 
     // Set appearance
     this.setAppearance(node, data);
@@ -305,16 +308,16 @@ export class InstanceNodeCreator extends BaseNodeCreator {
     // 设置特殊的布局属性
     if (data.layoutMode) {
       node.layoutMode = data.layoutMode;
-      if (data.primaryAxisSizingMode) node.primaryAxisSizingMode = data.primaryAxisSizingMode;
-      if (data.counterAxisSizingMode) node.counterAxisSizingMode = data.counterAxisSizingMode;
-      if (data.primaryAxisAlignItems) node.primaryAxisAlignItems = data.primaryAxisAlignItems;
-      if (data.counterAxisAlignItems) node.counterAxisAlignItems = data.counterAxisAlignItems;
-      if (data.layoutWrap !== undefined) node.layoutWrap = data.layoutWrap;
-      if (data.paddingLeft) node.paddingLeft = data.paddingLeft;
-      if (data.paddingRight) node.paddingRight = data.paddingRight;
-      if (data.paddingTop) node.paddingTop = data.paddingTop;
-      if (data.paddingBottom) node.paddingBottom = data.paddingBottom;
-      if (data.itemSpacing) node.itemSpacing = data.itemSpacing;
+      if (data.primaryAxisSizingMode && validateType(data.primaryAxisSizingMode, 'string')) node.primaryAxisSizingMode = data.primaryAxisSizingMode;
+      if (data.counterAxisSizingMode && validateType(data.counterAxisSizingMode, 'string')) node.counterAxisSizingMode = data.counterAxisSizingMode;
+      if (data.primaryAxisAlignItems && validateType(data.primaryAxisAlignItems, 'string')) node.primaryAxisAlignItems = data.primaryAxisAlignItems;
+      if (data.counterAxisAlignItems && validateType(data.counterAxisAlignItems, 'string')) node.counterAxisAlignItems = data.counterAxisAlignItems;
+      if (data.layoutWrap !== undefined && validateType(data.layoutWrap, 'boolean')) node.layoutWrap = data.layoutWrap;
+      if (data.paddingLeft !== undefined && validateType(data.paddingLeft, 'number')) node.paddingLeft = data.paddingLeft;
+      if (data.paddingRight !== undefined && validateType(data.paddingRight, 'number')) node.paddingRight = data.paddingRight;
+      if (data.paddingTop !== undefined && validateType(data.paddingTop, 'number')) node.paddingTop = data.paddingTop;
+      if (data.paddingBottom !== undefined && validateType(data.paddingBottom, 'number')) node.paddingBottom = data.paddingBottom;
+      if (data.itemSpacing !== undefined && validateType(data.itemSpacing, 'number')) node.itemSpacing = data.itemSpacing;
     }
 
     // 设置变换属性
