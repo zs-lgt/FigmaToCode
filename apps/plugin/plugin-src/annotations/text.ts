@@ -1,7 +1,7 @@
 import { BaseAnnotation } from './base';
 
 export class TextAnnotation extends BaseAnnotation {
-  public async create(node: SceneNode): Promise<void> {
+  public async create(node: SceneNode, text: string = "请输入交互描述..."): Promise<void> {
     try {
       // 增加计数器
       this.state.annotationCounter++;
@@ -28,20 +28,20 @@ export class TextAnnotation extends BaseAnnotation {
       frame.paddingBottom = 16;
 
       // 创建文本节点
-      const text = figma.createText();
-      text.name = "标注文本";
-      text.fontSize = 14;
-      text.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
-      text.characters = "请输入交互描述...";
+      const textNode = figma.createText();
+      textNode.name = "标注文本";
+      textNode.fontSize = 14;
+      textNode.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+      textNode.characters = text;
 
       // 设置文本节点大小和行为
-      text.textAutoResize = "HEIGHT";
-      text.resize(400 - 32, 400 - 32);
-      text.textAlignVertical = "TOP";
-      text.textAlignHorizontal = "LEFT";
+      textNode.textAutoResize = "HEIGHT";
+      textNode.resize(400 - 32, 400 - 32);
+      textNode.textAlignVertical = "TOP";
+      textNode.textAlignHorizontal = "LEFT";
 
       // 将文本添加到 frame 中
-      frame.appendChild(text);
+      frame.appendChild(textNode);
 
       // 创建标注框的圆形标记
       const targetNumber = figma.createFrame();
@@ -89,7 +89,7 @@ export class TextAnnotation extends BaseAnnotation {
 
       // 设置插件数据
       frame.setPluginData("type", "annotation-frame");
-      text.setPluginData("type", "annotation-text");
+      textNode.setPluginData("type", "annotation-text");
       sourceNumber.setPluginData("type", "annotation-number");
       targetNumber.setPluginData("type", "annotation-number");
       frame.setPluginData("annotation-number", this.state.annotationCounter.toString());
@@ -145,7 +145,7 @@ export class TextAnnotation extends BaseAnnotation {
         const hasTextChange = changes.some(
           (change) =>
             change.type === "PROPERTY_CHANGE" &&
-            change.node.id === text.id &&
+            change.node.id === textNode.id &&
             change.properties.includes("characters")
         );
 
@@ -155,7 +155,7 @@ export class TextAnnotation extends BaseAnnotation {
           frame.layoutMode = "VERTICAL";
 
           // 确保最小高度
-          const contentHeight = text.height + 32; // 文本高度 + padding
+          const contentHeight = textNode.height + 32; // 文本高度 + padding
           const newHeight = Math.max(400, contentHeight);
 
           // 如果高度需要调整，则调整
@@ -172,8 +172,8 @@ export class TextAnnotation extends BaseAnnotation {
       const selectionChangeHandler = () => {
         const selection = figma.currentPage.selection;
         if (selection.length === 0 || !selection.includes(frame)) {
-          if (text.characters === "") {
-            text.characters = "请输入交互描述...";
+          if (textNode.characters === "") {
+            textNode.characters = "请输入交互描述...";
           }
           // 只移除文本相关的事件监听器
           figma.off("documentchange", documentChangeHandler);

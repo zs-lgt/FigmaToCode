@@ -58,22 +58,7 @@ export class UXInfoAnnotationManager {
       }
 
       const annotationText = this.formatInteractionText(info);
-      await this.textAnnotation.create(node);
-      
-      // 获取最后创建的文本节点并更新内容
-      const frame = node.parent?.children.find(
-        child => child.type === "FRAME" && child.name === "标注框"
-      ) as FrameNode;
-      
-      if (frame) {
-        const textNode = frame.findOne(
-          child => child.type === "TEXT"
-        ) as TextNode;
-        
-        if (textNode) {
-          textNode.characters = annotationText;
-        }
-      }
+      await this.textAnnotation.create(node, annotationText);
     }
   }
 }
