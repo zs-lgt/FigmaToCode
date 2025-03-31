@@ -1,9 +1,9 @@
 import { TextAnnotation } from './text';
 
-interface UXInfo {
+type UXInfo = {
   hover?: string | null;
   click?: string | null;
-}
+} | string;
 
 interface NodeCache {
   [key: string]: SceneNode;
@@ -32,6 +32,11 @@ export class UXInfoAnnotationManager {
   }
 
   private formatInteractionText(uxInfo: UXInfo): string {
+    // 如果uxInfo是字符串，直接返回
+    if (typeof uxInfo === 'string') {
+      return uxInfo;
+    }
+    
     const parts: string[] = [];
     
     if (uxInfo.hover) {
@@ -39,7 +44,12 @@ export class UXInfoAnnotationManager {
     }
     
     if (uxInfo.click) {
-      parts.push(`点击时：${uxInfo.click}`);
+      // 如果只有click没有hover，并且不是采集了明确的"点击"信息，就直接使用评论文本
+      if (!uxInfo.hover && !uxInfo.click.toLowerCase().includes('点击') && !uxInfo.click.toLowerCase().includes('click')) {
+        parts.push(uxInfo.click);
+      } else {
+        parts.push(`点击时：${uxInfo.click}`);
+      }
     }
     
     return parts.join('\n\n');
@@ -52,9 +62,10 @@ export class UXInfoAnnotationManager {
         console.warn(`Node with ID ${nodeId} not found`);
         continue;
       }
-
-      if (!info.hover && !info.click) {
-        continue; // Skip if no interaction info
+      
+      // 跳过没有信息的节点（仅当info是对象且没有hover和click属性时）
+      if (typeof info === 'object' && !info.hover && !info.click) {
+        continue;
       }
 
       const annotationText = this.formatInteractionText(info);

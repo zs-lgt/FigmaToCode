@@ -228,11 +228,47 @@ const standardMode = async () => {
         throw new Error('No data provided');
       }
 
-      importFigmaJSON(data).then(() => {
+      // 创建一个变量来收集有comment的节点及其ID
+      const nodesWithComments = new Map<string, { node: SceneNode, comments: string[] }>();
+      
+      // 创建一个收集器函数，导入过程中将收集有comment的节点
+      const commentCollector = (nodeId: string, node: SceneNode, comments: string[]) => {
+        if (comments && comments.length > 0) {
+          nodesWithComments.set(nodeId, { node, comments });
+        }
+      };
+
+      importFigmaJSON(data, commentCollector).then(() => {
+        // 如果有带comments的节点，则创建UX标注
+        if (nodesWithComments.size > 0) {
+          (async () => {
+            try {
+              // 准备UX信息数据
+              const uxInfoData: Record<string, string> = {};
+              
+              // 遍历带comments的节点
+              for (const [nodeId, { node, comments }] of nodesWithComments.entries()) {
+                // 直接将所有评论合并为一个字符串作为标注内容
+                uxInfoData[nodeId] = comments.join('\n\n');
+              }
+              
+              // 创建并使用UX标注管理器
+              const textAnnotation = new TextAnnotation();
+              const uxManager = new UXInfoAnnotationManager(textAnnotation);
+              await uxManager.processUXInfo(uxInfoData);
+              
+              figma.notify(`已为 ${nodesWithComments.size} 个节点创建UX标注`);
+            } catch (error: any) {
+              console.error('创建UX标注时出错:', error);
+              figma.notify(`创建UX标注失败: ${error.message}`, { error: true });
+            }
+          })();
+        }
+        
         // 发送成功消息
         figma.ui.postMessage({
           type: "success",
-          data: "Figma文件导入成功",
+          data: `Figma文件导入成功${nodesWithComments.size > 0 ? `，并为 ${nodesWithComments.size} 个节点创建了UX标注` : ''}`,
         });
       }).catch((error) => {
         console.error('Error importing Figma JSON:', error);

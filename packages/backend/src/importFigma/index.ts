@@ -151,7 +151,12 @@ interface GroupConversionTask {
 }
 
 // Main function to import nodes - 优化版本
-export async function importNode(data: any, parent: BaseNode & ChildrenMixin, parentBounds?: { x: number, y: number }): Promise<SceneNode | null> {
+export async function importNode(
+  data: any, 
+  parent: BaseNode & ChildrenMixin, 
+  parentBounds?: { x: number, y: number },
+  commentCallback?: (nodeId: string, node: SceneNode, comments: string[]) => void
+): Promise<SceneNode | null> {
   try {
     // 使用队列处理节点，避免深度递归
     const queue: NodeProcessingTask[] = [{ data, parent, parentBounds }];
@@ -241,6 +246,11 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
       creator.setBaseProperties(node, nodeData);
       const nodeBounds = creator.setGeometry(node, nodeData, bounds);
       creator.setAppearance(node, nodeData);
+      
+      // 检查是否有comment字段，并调用回调
+      if (commentCallback && nodeData.id && nodeData.comment && Array.isArray(nodeData.comment) && nodeData.comment.length > 0) {
+        commentCallback(nodeData.id, node, nodeData.comment);
+      }
 
       // 如果是GROUP节点，添加到转换任务列表
       if (nodeData.type === 'GROUP' && node.type === 'FRAME') {
@@ -324,6 +334,11 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
           // 更新节点映射
           if (nodeData.id) {
             nodeMap.set(nodeData.id, group);
+            
+            // 如果原节点有comments，需要为新的group节点调用comment回调
+            if (commentCallback && nodeData.comment && Array.isArray(nodeData.comment) && nodeData.comment.length > 0) {
+              commentCallback(nodeData.id, group, nodeData.comment);
+            }
           }
         } else {
           console.log(`[GROUP转换] 无法转换为组，因为没有子节点: ${frameNode.name}`);
@@ -342,7 +357,10 @@ export async function importNode(data: any, parent: BaseNode & ChildrenMixin, pa
 }
 
 // Entry point for importing Figma JSON
-export async function importFigmaJSON(jsonData: any): Promise<SceneNode[]> {
+export async function importFigmaJSON(
+  jsonData: any, 
+  commentCallback?: (nodeId: string, node: SceneNode, comments: string[]) => void
+): Promise<SceneNode[]> {
   try {
     // 性能优化：添加进度反馈
     figma.notify('开始导入JSON数据...', { timeout: 1000 });
@@ -422,7 +440,7 @@ export async function importFigmaJSON(jsonData: any): Promise<SceneNode[]> {
       
       // 并行处理一批节点
       const batchPromises = batch.map(nodeData => 
-        importNode(nodeData, figma.currentPage, { x: minX, y: minY })
+        importNode(nodeData, figma.currentPage, { x: minX, y: minY }, commentCallback)
       );
       
       const batchResults = await Promise.all(batchPromises);
