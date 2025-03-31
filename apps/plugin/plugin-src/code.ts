@@ -229,40 +229,38 @@ const standardMode = async () => {
       }
 
       // 创建一个变量来收集有comment的节点及其ID
-      const nodesWithComments = new Map<string, { node: SceneNode, comments: string[] }>();
+      const nodesWithComments = new Map<string, { node: SceneNode, comment: string[] }>();
       
       // 创建一个收集器函数，导入过程中将收集有comment的节点
-      const commentCollector = (nodeId: string, node: SceneNode, comments: string[]) => {
-        if (comments && comments.length > 0) {
-          nodesWithComments.set(nodeId, { node, comments });
+      const commentCollector = (nodeId: string, node: SceneNode, data: any) => {
+        console.log('comments', data)
+        if (data.comment) {
+          nodesWithComments.set(node.id, { node, comment: data.comment });
         }
       };
-
-      importFigmaJSON(data, commentCollector).then(() => {
+      importFigmaJSON(data, commentCollector).then(async () => {
         // 如果有带comments的节点，则创建UX标注
         if (nodesWithComments.size > 0) {
-          (async () => {
             try {
               // 准备UX信息数据
               const uxInfoData: Record<string, string> = {};
               
               // 遍历带comments的节点
-              for (const [nodeId, { node, comments }] of nodesWithComments.entries()) {
+              for (const [nodeId, { node, comment }] of nodesWithComments.entries()) {
                 // 直接将所有评论合并为一个字符串作为标注内容
-                uxInfoData[nodeId] = comments.join('\n\n');
+                uxInfoData[nodeId] = comment.join('\n\n');
               }
-              
+              console.log('11111', uxInfoData)
               // 创建并使用UX标注管理器
               const textAnnotation = new TextAnnotation();
               const uxManager = new UXInfoAnnotationManager(textAnnotation);
               await uxManager.processUXInfo(uxInfoData);
-              
+              console.log('22222', uxInfoData)
               figma.notify(`已为 ${nodesWithComments.size} 个节点创建UX标注`);
             } catch (error: any) {
               console.error('创建UX标注时出错:', error);
               figma.notify(`创建UX标注失败: ${error.message}`, { error: true });
-            }
-          })();
+            };
         }
         
         // 发送成功消息
