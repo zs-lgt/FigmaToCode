@@ -233,7 +233,6 @@ const standardMode = async () => {
       
       // 创建一个收集器函数，导入过程中将收集有comment的节点
       const commentCollector = (nodeId: string, node: SceneNode, data: any) => {
-        console.log('comments', data)
         if (data.comment) {
           nodesWithComments.set(node.id, { node, comment: data.comment });
         }
@@ -250,12 +249,10 @@ const standardMode = async () => {
                 // 直接将所有评论合并为一个字符串作为标注内容
                 uxInfoData[nodeId] = comment.join('\n\n');
               }
-              console.log('11111', uxInfoData)
               // 创建并使用UX标注管理器
               const textAnnotation = new TextAnnotation();
               const uxManager = new UXInfoAnnotationManager(textAnnotation);
               await uxManager.processUXInfo(uxInfoData);
-              console.log('22222', uxInfoData)
               figma.notify(`已为 ${nodesWithComments.size} 个节点创建UX标注`);
             } catch (error: any) {
               console.error('创建UX标注时出错:', error);

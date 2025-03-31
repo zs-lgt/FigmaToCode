@@ -155,7 +155,7 @@ export async function importNode(
   data: any, 
   parent: BaseNode & ChildrenMixin, 
   parentBounds?: { x: number, y: number },
-  commentCallback?: (nodeId: string, node: SceneNode, comments: string[]) => void
+  callback?: (nodeId: string, node: SceneNode, nodeData: any) => void
 ): Promise<SceneNode | null> {
   try {
     // 使用队列处理节点，避免深度递归
@@ -172,7 +172,6 @@ export async function importNode(
     while (queue.length > 0) {
       const task = queue.shift()!;
       const { data: nodeData, parent: parentNode, parentBounds: bounds, isGroupChild } = task;
-      
       // 创建当前节点
       let node: SceneNode | null = null;
       
@@ -248,8 +247,9 @@ export async function importNode(
       creator.setAppearance(node, nodeData);
       
       // 检查是否有comment字段，并调用回调
-      if (commentCallback && nodeData.id && nodeData.comment && Array.isArray(nodeData.comment) && nodeData.comment.length > 0) {
-        commentCallback(nodeData.id, node, nodeData.comment);
+      if (callback) {
+        console.log('nodeData', nodeData)
+        callback(nodeData.id, node, nodeData);
       }
 
       // 如果是GROUP节点，添加到转换任务列表
@@ -309,7 +309,7 @@ export async function importNode(
     // 所有节点都处理完毕后，执行GROUP转换任务
     for (const task of groupConversionTasks) {
       const { frameNode, parentNode, nodeData } = task;
-      
+      console.log('frameNode', nodeData)
       try {
         const children = [...frameNode.children];
         if (children.length > 0) {
@@ -336,8 +336,8 @@ export async function importNode(
             nodeMap.set(nodeData.id, group);
             
             // 如果原节点有comments，需要为新的group节点调用comment回调
-            if (commentCallback && nodeData.comment && Array.isArray(nodeData.comment) && nodeData.comment.length > 0) {
-              commentCallback(nodeData.id, group, nodeData.comment);
+            if (callback) {
+              callback(nodeData.id, group, nodeData);
             }
           }
         } else {
@@ -359,7 +359,7 @@ export async function importNode(
 // Entry point for importing Figma JSON
 export async function importFigmaJSON(
   jsonData: any, 
-  commentCallback?: (nodeId: string, node: SceneNode, comments: string[]) => void
+  callback?: (nodeId: string, node: SceneNode, nodeData: any) => void
 ): Promise<SceneNode[]> {
   try {
     // 性能优化：添加进度反馈
@@ -439,8 +439,8 @@ export async function importFigmaJSON(
       }
       
       // 并行处理一批节点
-      const batchPromises = batch.map(nodeData => 
-        importNode(nodeData, figma.currentPage, { x: minX, y: minY }, commentCallback)
+      const batchPromises = batch.map(async(nodeData) => 
+        await importNode(nodeData, figma.currentPage, { x: minX, y: minY }, callback)
       );
       
       const batchResults = await Promise.all(batchPromises);
