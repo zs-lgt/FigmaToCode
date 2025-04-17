@@ -137,6 +137,8 @@ export const PluginUI = (props: PluginUIProps) => {
   const [showUxImportModal, setShowUxImportModal] = useState(false);
   const [showImg2FigmaModal, setShowImg2FigmaModal] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [showHtml2FigmaModal, setShowHtml2FigmaModal] = useState(false);
+  const [html2figmaInput, setHtml2figmaInput] = useState('');
   const imageInputRef = useRef<HTMLInputElement>(null);
 
   // 处理插件消息
@@ -158,13 +160,17 @@ export const PluginUI = (props: PluginUIProps) => {
         } else if (message.source === 'img2figma') {
           setShowImg2FigmaModal(false);
           setImagePreview(null);
+        } else if (message.source === 'html2figma') {
+          setShowHtml2FigmaModal(false);
+          setHtml2figmaInput('');
         } else if (message.source === 'modify-component') {
           setShowModifyComponentModal(false);
           setModifyComponentInput('');
         }
         
-        // 只有文生组件和图生组件相关的消息才使用 Modal
-        if (message.source === 'nl2figma' || message.source === 'img2figma' || message.source === 'modify-component') {
+        // 使用Modal显示成功消息
+        if (message.source === 'nl2figma' || message.source === 'img2figma' || 
+            message.source === 'html2figma' || message.source === 'modify-component') {
           setModalMessage(message.data);
           setIsModalOpen(true);
         }
@@ -174,8 +180,9 @@ export const PluginUI = (props: PluginUIProps) => {
         // 关闭加载状态
         setIsLoading(false);
         
-        // 只有文生组件和图生组件相关的错误才使用 Modal
-        if (message.source === 'nl2figma' || message.source === 'img2figma' || message.source === 'modify-component') {
+        // 使用Modal显示错误消息
+        if (message.source === 'nl2figma' || message.source === 'img2figma' || 
+            message.source === 'html2figma' || message.source === 'modify-component') {
           setModalMessage(message.data);
           setIsModalOpen(true);
           
@@ -190,6 +197,9 @@ export const PluginUI = (props: PluginUIProps) => {
             } else if (message.source === 'img2figma') {
               setShowImg2FigmaModal(false);
               setImagePreview(null);
+            } else if (message.source === 'html2figma') {
+              setShowHtml2FigmaModal(false);
+              setHtml2figmaInput('');
             }
           }
         } else {
@@ -453,6 +463,30 @@ export const PluginUI = (props: PluginUIProps) => {
     }
   };
 
+  const handleHtml2FigmaClick = () => {
+    setShowHtml2FigmaModal(true);
+  };
+
+  const handleHtml2FigmaSubmit = () => {
+    try {
+      setIsLoading(true);
+      // 发送消息到插件后端处理API调用
+      window.parent.postMessage(
+        { 
+          pluginMessage: { 
+            type: "html2figma-generate",
+            url: html2figmaInput
+          } 
+        },
+        "*"
+      );
+    } catch (error: any) {
+      setIsLoading(false);
+      console.error('发送请求失败:', error);
+      alert(`发送请求失败: ${error.message}`);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
@@ -475,128 +509,137 @@ export const PluginUI = (props: PluginUIProps) => {
       
       {/* Node Control Buttons */}
       <div className="flex gap-2 p-2 justify-end">
-        <button
-          onClick={handleCodeGenToggle}
-          className={`px-2 py-1 text-sm font-medium rounded-md transition-all duration-200 ${
-            enableCodeGen 
-            ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100" 
-            : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-          }`}
-        >
-          {enableCodeGen ? "关闭代码生成" : "开启代码生成"}
-        </button>
-        
-        <button
-          onClick={() => setShowUiJsonModal(true)}
-          className="px-3 py-1 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 rounded-md shadow-sm"
-        >
-          导入JSON
-        </button>
+        <div className="p-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleCodeGenToggle}
+              className={`px-2 py-1 text-sm font-medium rounded-md transition-all duration-200 ${
+                enableCodeGen 
+                ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-100" 
+                : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+              }`}
+            >
+              {enableCodeGen ? "关闭代码生成" : "开启代码生成"}
+            </button>
+            
+            <button
+              onClick={() => setShowUiJsonModal(true)}
+              className="px-3 py-1 text-sm font-semibold text-white bg-green-500 hover:bg-green-600 rounded-md shadow-sm"
+            >
+              导入JSON
+            </button>
 
-        <div className="flex space-x-2">
-          <button
-            onClick={handleExportSelectedNodesClick}
-            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-          >
-            导出选中
-          </button>
-          <button
-            onClick={handleExportNodesClick}
-            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-          >
-            导出设计信息（精简版）
-          </button>
-          <button
-            onClick={handleExportCompleteNodesClick}
-            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-          >
-            导出设计信息（完整版）
-          </button>
-          <button
-            onClick={handleNL2FigmaClick}
-            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            文生组件
-          </button>
-          <button
-            onClick={handleImg2FigmaClick}
-            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            图生组件
-          </button>
-          <button
-            onClick={handleModifyComponentClick}
-            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-          >
-            修改组件
-          </button>
-          <button
-            onClick={() => setShowUxImportModal(true)}
-            className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            导入UX
-          </button>
+            <button
+              onClick={handleExportSelectedNodesClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              导出选中
+            </button>
+            <button
+              onClick={handleExportNodesClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              导出设计信息（精简版）
+            </button>
+            <button
+              onClick={handleExportCompleteNodesClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              导出设计信息（完整版）
+            </button>
+
+            <button
+              onClick={handleNL2FigmaClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              文生组件
+            </button>
+            <button
+              onClick={handleImg2FigmaClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              图生组件
+            </button>
+            <button
+              onClick={handleModifyComponentClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              修改组件
+            </button>
+            <button
+              onClick={() => setShowUxImportModal(true)}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              导入UX
+            </button>
+            <button
+              onClick={handleHtml2FigmaClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Html2Figma
+            </button>
+          </div>
         </div>
+      </div>
 
-        {/* UX Import Modal */}
-        {showUxImportModal && (
-          <div className="fixed inset-0 z-10 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-                <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+      {/* UX Import Modal */}
+      {showUxImportModal && (
+        <div className="fixed inset-0 z-10 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div className="inline-block px-4 pt-5 pb-4 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div>
+                <h3 className="text-lg font-medium leading-6 text-gray-900">导入UX交互信息</h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500">请选择UX交互信息的JSON文件</p>
+                </div>
+                <div className="mt-4">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          try {
+                            const jsonData = JSON.parse(event.target?.result as string);
+                            window.parent.postMessage(
+                              { 
+                                pluginMessage: { 
+                                  type: 'import-ux-info',
+                                  data: jsonData
+                                } 
+                              },
+                              "*"
+                            );
+                            setShowUxImportModal(false);
+                          } catch (error) {
+                            alert('无效的JSON文件');
+                          }
+                        };
+                        reader.readAsText(file);
+                      }
+                    }}
+                    className="w-full p-2 mt-1 border border-gray-300 rounded-md"
+                  />
+                </div>
               </div>
-              <div className="inline-block px-4 pt-5 pb-4 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-                <div>
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">导入UX交互信息</h3>
-                  <div className="mt-2">
-                    <p className="text-sm text-gray-500">请选择UX交互信息的JSON文件</p>
-                  </div>
-                  <div className="mt-4">
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            try {
-                              const jsonData = JSON.parse(event.target?.result as string);
-                              window.parent.postMessage(
-                                { 
-                                  pluginMessage: { 
-                                    type: 'import-ux-info',
-                                    data: jsonData
-                                  } 
-                                },
-                                "*"
-                              );
-                              setShowUxImportModal(false);
-                            } catch (error) {
-                              alert('无效的JSON文件');
-                            }
-                          };
-                          reader.readAsText(file);
-                        }
-                      }}
-                      className="w-full p-2 mt-1 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-                <div className="mt-5 sm:mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowUxImportModal(false)}
-                    className="inline-flex justify-center w-full px-4 py-2 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
-                  >
-                    取消
-                  </button>
-                </div>
+              <div className="mt-5 sm:mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowUxImportModal(false)}
+                  className="inline-flex justify-center w-full px-4 py-2 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
+                >
+                  取消
+                </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* UI JSON Import Modal */}
       {showUiJsonModal && (
@@ -830,6 +873,52 @@ export const PluginUI = (props: PluginUIProps) => {
                 onClick={handleImg2FigmaSubmit}
                 className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center ${isLoading || !imagePreview ? 'opacity-50 cursor-not-allowed' : ''}`}
                 disabled={isLoading || !imagePreview}
+              >
+                {isLoading ? '生成中...' : '生成'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* HTML2Figma Modal */}
+      {showHtml2FigmaModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium dark:text-white">HTML2Figma</h3>
+              {isLoading && (
+                <div className="flex items-center text-sm text-blue-600 dark:text-blue-400">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  生成中...
+                </div>
+              )}
+            </div>
+            <textarea
+              value={html2figmaInput}
+              onChange={(e) => setHtml2figmaInput(e.target.value)}
+              className="w-full h-32 p-2 border rounded-md mb-4 dark:bg-gray-700 dark:text-white"
+              placeholder="请输入HTML URL"
+              disabled={isLoading}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowHtml2FigmaModal(false);
+                  setHtml2figmaInput('');
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                disabled={isLoading}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleHtml2FigmaSubmit}
+                className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isLoading}
               >
                 {isLoading ? '生成中...' : '生成'}
               </button>
@@ -1355,7 +1444,7 @@ export const Preview: React.FC<{
       <div className="py-1.5 flex gap-2 w-full text-lg font-medium text-center dark:text-white rounded-lg justify-between">
         <span>代码预览</span>
         <button
-          className={`px-2 py-1 text-sm font-semibold border border-green-500 rounded-md shadow-sm hover:bg-green-500 dark:hover:bg-green-600 hover:text-white hover:border-transparent transition-all duration-300 ${"bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 border-neutral-300 dark:border-neutral-600"}`}
+          className={`px-2 py-1 text-sm font-semibold border border-green-500 rounded-md shadow-sm hover:bg-green-500 dark:hover:bg-green-600 hover:text-white hover:border-transparent transition-all duration-300 ${"bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200"}`}
           onClick={() => {
             props.setIsResponsiveExpanded(!props.isResponsiveExpanded);
           }}

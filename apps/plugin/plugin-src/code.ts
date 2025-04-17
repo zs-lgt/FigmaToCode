@@ -465,11 +465,11 @@ const standardMode = async () => {
       });
     } else if (msg.type === 'export-selected-nodes') {
       const nodes = figma.currentPage.selection;
-      exportNodes(nodes, msg.optimize, false).then(nodesData => {
+      exportNodes(nodes, msg.optimize, false).then(async nodesData => {
         const { nodesInfo, description, images, optimize } = nodesData;
         const imagesData = [];
         for (const imageId of images) {
-          const imageBase64 = getNodeExportImage(imageId.id);
+          const imageBase64 = await getNodeExportImage(imageId.id);
           if (imageBase64) {
             imagesData.push({
               id: imageId.id,
@@ -489,6 +489,43 @@ const standardMode = async () => {
           }
         });
       });
+    } else if (msg.type === 'html2figma-generate') {
+      (async () => {
+        try {
+          if (!msg.url) {
+            throw new Error('没有提供HTML URL');
+          }
+          
+          // 调用API
+          const data = await callHtml2FigmaAPI(msg.url);
+          
+          if (data.status === 'success' && data.figma_json) {
+            try {
+              const parsedJson = JSON.parse(data.figma_json);
+              // 导入生成的组件
+              const importedNodes = await importFigmaJSON(parsedJson);
+              
+              // 将url和llmout作为一对数据存储到节点信息中
+              if (importedNodes && importedNodes.length > 0 && data.llmout) {
+                // 只在最外层节点上存储历史记录
+                const topLevelNode = importedNodes[0];
+                storeHistoryData(topLevelNode, `HTML转换：${msg.url}`, data.llmout);
+              }
+              
+              // 发送成功消息
+              sendResultMessage(true, "html2figma", data.llmout || '组件生成成功');
+            } catch (parseError) {
+              throw new Error('JSON解析错误');
+            }
+          } else {
+            throw new Error(`API返回状态错误: ${data.status}`);
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : '未知错误';
+          console.error('HTML转换失败:', error);
+          sendResultMessage(false, "html2figma", `HTML转换失败: ${errorMessage}`);
+        }
+      })();
     }
     if (msg.type === 'resize') {
       figma.ui.resize(msg.width, msg.height);
@@ -653,6 +690,25 @@ const callImg2FigmaAPI = async (img_base64: string, traceId: string = '123') => 
     headers: {},
     body: JSON.stringify({
       img_base64: base64Data,
+      traceId
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return await response.json();
+};
+
+// Html2Figma API
+const callHtml2FigmaAPI = async (url: string, traceId: string = '123') => {
+  const API_BASE_URL = 'https://occ.10jqka.com.cn/figma2code/webapi_fuzz/v1/html2figma';
+  const response = await fetch(`${API_BASE_URL}`, {
+    method: 'POST',
+    headers: {},
+    body: JSON.stringify({
+      url,
       traceId
     })
   });
