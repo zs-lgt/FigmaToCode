@@ -257,114 +257,117 @@ export async function importNode(
           node = await factory.createNode(nodeData.type, nodeData);
         }
       } 
-      // 处理COMPONENT_SET节点 - 通过componentKey导入
-      else if (nodeData.type === 'COMPONENT_SET' && nodeData.componentKey) {
-        console.log(2);
+      // todo：临时注释掉克隆方案，本地已有组件再导入没有意义，后面探索凭空导入团队库组件的方案
+      // // 处理COMPONENT_SET节点 - 通过componentKey导入
+      // else if (nodeData.type === 'COMPONENT_SET' && nodeData.componentKey) {
+      //   console.log(2);
         
-        // 直接尝试在本地查找组件集
-        try {
-          // 确保所有页面都已加载
-          await figma.loadAllPagesAsync();
+      //   // 直接尝试在本地查找组件集
+      //   try {
+      //     // 确保所有页面都已加载
+      //     await figma.loadAllPagesAsync();
           
-          // 查找所有组件集
-          const componentSets = figma.root.findAllWithCriteria({
-            types: ["COMPONENT_SET"],
-          });
+      //     // 查找所有组件集
+      //     const componentSets = figma.root.findAllWithCriteria({
+      //       types: ["COMPONENT_SET"],
+      //     });
           
-          // 根据componentKey查找匹配的组件集
-          const localComponentSet = componentSets.find(cs => cs.key === nodeData.componentKey);
+      //     // 根据componentKey查找匹配的组件集
+      //     const localComponentSet = componentSets.find(cs => cs.key === nodeData.componentKey);
           
-          if (localComponentSet) {
-            // 使用找到的组件集
-            node = localComponentSet.clone();
-            console.log(`找到本地组件集: ${localComponentSet.name}`);
+      //     if (localComponentSet) {
+      //       // 使用找到的组件集
+      //       node = localComponentSet.clone();
+      //       console.log(`找到本地组件集: ${localComponentSet.name}`);
             
-            // 保持原有的位置属性
-            if (nodeData.x !== undefined) node.x = nodeData.x;
-            if (nodeData.y !== undefined) node.y = nodeData.y;
+      //       // 保持原有的位置属性
+      //       if (nodeData.x !== undefined) node.x = nodeData.x;
+      //       if (nodeData.y !== undefined) node.y = nodeData.y;
             
-            // 设置组件属性
-            if (nodeData.componentPropertyDefinitions) {
-              await setComponentProperties(
-                node as ComponentNode | ComponentSetNode,
-                nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
-              );
-            }
-          } else {
-            console.warn(`未找到匹配的本地组件集，componentKey: ${nodeData.componentKey}`);
-          }
-        } catch (localError) {
-          console.error('本地组件集查找失败:', localError);
-        }
+      //       // 设置组件属性
+      //       if (nodeData.componentPropertyDefinitions) {
+      //         await setComponentProperties(
+      //           node as ComponentNode | ComponentSetNode,
+      //           nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
+      //         );
+      //       }
+      //     } else {
+      //       console.warn(`未找到匹配的本地组件集，componentKey: ${nodeData.componentKey}`);
+      //     }
+      //   } catch (localError) {
+      //     console.error('本地组件集查找失败:', localError);
+      //   }
         
-        // 如果本地查找失败，使用常规方法创建节点
-        if (!node) {
-          const factory = new NodeFactory();
-          node = await factory.createNode(nodeData.type, nodeData);
+      //   // 如果本地查找失败，使用常规方法创建节点
+      //   if (!node) {
+      //     const factory = new NodeFactory();
+      //     node = await factory.createNode(nodeData.type, nodeData);
           
-          // 使用通用方法设置组件属性
-          if (node && nodeData.componentPropertyDefinitions && 
-              (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET')) {
-            await setComponentProperties(
-              node as ComponentNode | ComponentSetNode,
-              nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
-            );
-          }
-        }
-      }
-      // 处理COMPONENT节点 - 通过componentKey导入
-      else if (nodeData.type === 'COMPONENT' && nodeData.componentKey) {
-        console.log(3);
+      //     // 使用通用方法设置组件属性
+      //     if (node && nodeData.componentPropertyDefinitions && 
+      //         (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET')) {
+      //       await setComponentProperties(
+      //         node as ComponentNode | ComponentSetNode,
+      //         nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
+      //       );
+      //     }
+      //   }
+      // }
+      // // 处理COMPONENT节点 - 通过componentKey导入
+      // else if (nodeData.type === 'COMPONENT' && nodeData.componentKey) {
+      //   console.log(3);
         
-        // 直接尝试在本地查找组件
-        try {
-          // 确保所有页面都已加载
-          await figma.loadAllPagesAsync();
-          // 查找所有组件
-          const components = figma.root.findAllWithCriteria({
-            types: ["COMPONENT"],
-          });
+      //   // 直接尝试在本地查找组件
+      //   try {
+      //     // 确保所有页面都已加载
+      //     await figma.loadAllPagesAsync();
+      //     // 查找所有组件
+      //     const components = figma.root.findAllWithCriteria({
+      //       types: ["COMPONENT"],
+      //     });
 
-          // 根据componentKey查找匹配的组件
-          const localComponent = components.find(c => c.key === nodeData.componentKey);
-          if (localComponent) {
-            // 使用找到的组件
-            node = localComponent.clone();
-            console.log(`找到并克隆本地组件: ${localComponent.name}`);
+      //     // 根据componentKey查找匹配的组件
+      //     const localComponent = components.find(c => c.key === nodeData.componentKey);
+      //     if (localComponent) {
+      //       // 使用找到的组件
+      //       node = localComponent.clone();
+      //       console.log(`找到并克隆本地组件: ${localComponent.name}`);
             
-            // 保持原有的位置属性
-            if (nodeData.x !== undefined) node.x = nodeData.x;
-            if (nodeData.y !== undefined) node.y = nodeData.y;
+      //       // 保持原有的位置属性
+      //       if (nodeData.x !== undefined) node.x = nodeData.x;
+      //       if (nodeData.y !== undefined) node.y = nodeData.y;
             
-            // 设置组件属性
-            if (nodeData.componentPropertyDefinitions) {
-              await setComponentProperties(
-                node as ComponentNode | ComponentSetNode,
-                nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
-              );
-            }
-          } else {
-            console.warn(`未找到匹配的本地组件，componentKey: ${nodeData.componentKey}`);
-          }
-        } catch (localError) {
-          console.error('本地组件查找失败:', localError);
-        }
+      //       // 设置组件属性
+      //       if (nodeData.componentPropertyDefinitions) {
+      //         await setComponentProperties(
+      //           node as ComponentNode | ComponentSetNode,
+      //           nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
+      //         );
+      //       }
+      //     } else {
+      //       console.warn(`未找到匹配的本地组件，componentKey: ${nodeData.componentKey}`);
+      //     }
+      //   } catch (localError) {
+      //     console.error('本地组件查找失败:', localError);
+      //   }
         
-        // 如果本地查找失败，使用常规方法创建节点
-        if (!node) {
-          const factory = new NodeFactory();
-          node = await factory.createNode(nodeData.type, nodeData);
+      //   // 如果本地查找失败，使用常规方法创建节点
+      //   if (!node) {
           
-          // 使用通用方法设置组件属性
-          if (node && nodeData.componentPropertyDefinitions && 
-              (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET')) {
-            await setComponentProperties(
-              node as ComponentNode | ComponentSetNode,
-              nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
-            );
-          }
-        }
-      } else {
+      //     const factory = new NodeFactory();
+      //     node = await factory.createNode(nodeData.type, nodeData);
+          
+      //     // 使用通用方法设置组件属性
+      //     if (node && nodeData.componentPropertyDefinitions && 
+      //         (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET')) {
+      //       await setComponentProperties(
+      //         node as ComponentNode | ComponentSetNode,
+      //         nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
+      //       );
+      //     }
+      //   }
+      // }
+      else {
         // 其他类型节点使用原来的逻辑
         const factory = new NodeFactory();
         node = await factory.createNode(nodeData.type, nodeData);
@@ -418,9 +421,9 @@ export async function importNode(
           y: nodeData.relativeTransform ? nodeData.relativeTransform[1][2] : 0
         } : nodeBounds;
 
-        // 只有在非INSTANCE、非COMPONENT且非COMPONENT_SET节点时才处理子节点
+        // 只有在非INSTANCE时才处理子节点
         // 因为这些节点通过componentKey/clone导入时已经包含了子节点
-        if (nodeData.type !== 'INSTANCE' && nodeData.type !== 'COMPONENT' && nodeData.type !== 'COMPONENT_SET') {
+        if (nodeData.type !== 'INSTANCE') {
           // 将子节点添加到队列
           for (const childData of nodeData.children) {
             queue.push({
