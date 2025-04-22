@@ -174,40 +174,65 @@ export async function importNode(
       const { data: nodeData, parent: parentNode, parentBounds: bounds, isGroupChild } = task;
       // 创建当前节点
       let node: SceneNode | null = null;
-      console.log('haha', nodeData)
       // 特殊处理INSTANCE节点
       if (nodeData.type === 'INSTANCE') {
-        console.log(1);
+        console.log(1, nodeData);
         
         if (nodeData.componentKey) {
           try {
-            // 通过componentKey导入组件
-            const component = await figma.importComponentByKeyAsync(nodeData.componentKey);
-            if (component) {
-              // 创建实例
-              node = component.createInstance();
-              // 保持原有的x和y属性
+            // 直接在本地查找组件
+            await figma.loadAllPagesAsync();
+            const components = figma.root.findAllWithCriteria({
+              types: ["COMPONENT"],
+            });
+            
+            // 根据componentKey查找匹配的组件
+            const localComponent = components.find(c => c.key === nodeData.componentKey);
+            
+            if (localComponent) {
+              // 使用找到的组件创建实例
+              node = localComponent.createInstance();
+              console.log(`使用本地组件创建实例: ${localComponent.name}`, node);
+              
+              // 保持原有的位置属性
               if (nodeData.x !== undefined) node.x = nodeData.x;
               if (nodeData.y !== undefined) node.y = nodeData.y;
-            }
-          } catch (error) {
-            // 兜底方案：本地组件放本地
-            try {
-              const foundNode = figma.getNodeById(nodeData.id);
-              if (foundNode && foundNode.type === 'INSTANCE') {
-                const component = await foundNode.getMainComponentAsync();
-                if (component) {
-                  // 创建实例
-                  node = component.createInstance();
-                  // 保持原有的x和y属性
-                  if (nodeData.x !== undefined) node.x = nodeData.x;
-                  if (nodeData.y !== undefined) node.y = nodeData.y;
+              
+              // 设置组件属性
+              if (nodeData.componentProperties && 'componentProperties' in node) {
+                try {
+                  // 设置组件属性
+                  for (const key in nodeData.componentProperties) {
+                    if (key in node.componentProperties) {
+                      node.setProperties({ [key]: nodeData.componentProperties[key].value });
+                    }
+                  }
+                } catch (error) {
+                  console.warn('Failed to set componentProperties:', error);
                 }
               }
-            } catch (error) {
-              console.log(error);
+            } else {
+              // 如果本地未找到，尝试通过ID查找
+              try {
+                const foundNode = figma.getNodeById(nodeData.id);
+                if (foundNode && foundNode.type === 'INSTANCE') {
+                  const component = await foundNode.getMainComponentAsync();
+                  console.log(11, component);
+                  
+                  if (component) {
+                    // 创建实例
+                    node = component.createInstance();
+                    // 保持原有的x和y属性
+                    if (nodeData.x !== undefined) node.x = nodeData.x;
+                    if (nodeData.y !== undefined) node.y = nodeData.y;
+                  }
+                }
+              } catch (error) {
+                console.log('Failed to find node by ID:', error);
+              }
             }
-            console.warn(`Failed to import component by key: ${nodeData.componentKey}`, error);
+          } catch (localError) {
+            console.error('本地组件查找失败:', localError);
           }
         }
         
@@ -237,7 +262,6 @@ export async function importNode(
           if (localComponentSet) {
             // 使用找到的组件集
             node = localComponentSet.clone();
-            console.log(`找到本地组件集: ${localComponentSet.name}`);
             
             // 保持原有的位置属性
             if (nodeData.x !== undefined) node.x = nodeData.x;
@@ -308,21 +332,16 @@ export async function importNode(
         try {
           // 确保所有页面都已加载
           await figma.loadAllPagesAsync();
-          
           // 查找所有组件
           const components = figma.root.findAllWithCriteria({
             types: ["COMPONENT"],
           });
-          
-          console.log(`查找到 ${components.length} 个本地组件`);
-          
+
           // 根据componentKey查找匹配的组件
           const localComponent = components.find(c => c.key === nodeData.componentKey);
-          
           if (localComponent) {
             // 使用找到的组件
             node = localComponent.clone();
-            console.log(`找到并克隆本地组件: ${localComponent.name}`);
             
             // 保持原有的位置属性
             if (nodeData.x !== undefined) node.x = nodeData.x;
@@ -452,7 +471,6 @@ export async function importNode(
     // 所有节点都处理完毕后，执行GROUP转换任务
     for (const task of groupConversionTasks) {
       const { frameNode, parentNode, nodeData } = task;
-      console.log('frameNode', nodeData)
       try {
         const children = [...frameNode.children];
         if (children.length > 0) {
