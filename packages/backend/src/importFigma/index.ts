@@ -174,9 +174,11 @@ export async function importNode(
       const { data: nodeData, parent: parentNode, parentBounds: bounds, isGroupChild } = task;
       // 创建当前节点
       let node: SceneNode | null = null;
-      
+      console.log('haha', nodeData)
       // 特殊处理INSTANCE节点
       if (nodeData.type === 'INSTANCE') {
+        console.log(1);
+        
         if (nodeData.componentKey) {
           try {
             // 通过componentKey导入组件
@@ -214,12 +216,147 @@ export async function importNode(
           const factory = new NodeFactory();
           node = await factory.createNode(nodeData.type, nodeData);
         }
+      } 
+      // 处理COMPONENT_SET节点 - 通过componentKey导入
+      else if (nodeData.type === 'COMPONENT_SET' && nodeData.componentKey) {
+        console.log(2);
+        
+        // 直接尝试在本地查找组件集
+        try {
+          // 确保所有页面都已加载
+          await figma.loadAllPagesAsync();
+          
+          // 查找所有组件集
+          const componentSets = figma.root.findAllWithCriteria({
+            types: ["COMPONENT_SET"],
+          });
+          
+          // 根据componentKey查找匹配的组件集
+          const localComponentSet = componentSets.find(cs => cs.key === nodeData.componentKey);
+          
+          if (localComponentSet) {
+            // 使用找到的组件集
+            node = localComponentSet.clone();
+            console.log(`找到本地组件集: ${localComponentSet.name}`);
+            
+            // 保持原有的位置属性
+            if (nodeData.x !== undefined) node.x = nodeData.x;
+            if (nodeData.y !== undefined) node.y = nodeData.y;
+            
+            // 保留原始的componentPropertyDefinitions
+            if (nodeData.componentPropertyDefinitions && 
+                'componentPropertyDefinitions' in node) {
+              try {
+                // @ts-ignore - 设置组件属性定义
+                node.componentPropertyDefinitions = JSON.parse(
+                  JSON.stringify(nodeData.componentPropertyDefinitions)
+                );
+              } catch (error) {
+                console.warn('Failed to set componentPropertyDefinitions:', error);
+              }
+            }
+          } else {
+            console.warn(`未找到匹配的本地组件集，componentKey: ${nodeData.componentKey}`);
+          }
+        } catch (localError) {
+          console.error('本地组件集查找失败:', localError);
+        }
+        
+        // 如果本地查找失败，使用常规方法创建节点
+        if (!node) {
+          const factory = new NodeFactory();
+          node = await factory.createNode(nodeData.type, nodeData);
+        }
+        
+        // 将节点添加到父节点
+        if (node && parentNode) {
+          parentNode.appendChild(node);
+        }
+        
+        // 如果成功创建了节点，设置基本属性并执行回调
+        if (node) {
+          // 设置基本属性
+          const creator = new BaseNodeCreator();
+          creator.setBaseProperties(node, nodeData);
+          creator.setGeometry(node, nodeData, bounds);
+          creator.setAppearance(node, nodeData);
+          
+          // 执行回调
+          if (callback) {
+            callback(nodeData.id, node, nodeData);
+          }
+          
+          // 保存根节点引用
+          if (rootNode === null && queue.length === 0) {
+            rootNode = node;
+          }
+          
+          // 添加到映射表
+          if (nodeData.id) {
+            nodeMap.set(nodeData.id, node);
+          }
+          
+          // 对于COMPONENT_SET，跳过处理子节点
+          continue;
+        }
+      }
+      // 处理COMPONENT节点 - 通过componentKey导入
+      else if (nodeData.type === 'COMPONENT' && nodeData.componentKey) {
+        console.log(3);
+        
+        // 直接尝试在本地查找组件
+        try {
+          // 确保所有页面都已加载
+          await figma.loadAllPagesAsync();
+          
+          // 查找所有组件
+          const components = figma.root.findAllWithCriteria({
+            types: ["COMPONENT"],
+          });
+          
+          console.log(`查找到 ${components.length} 个本地组件`);
+          
+          // 根据componentKey查找匹配的组件
+          const localComponent = components.find(c => c.key === nodeData.componentKey);
+          
+          if (localComponent) {
+            // 使用找到的组件
+            node = localComponent.clone();
+            console.log(`找到并克隆本地组件: ${localComponent.name}`);
+            
+            // 保持原有的位置属性
+            if (nodeData.x !== undefined) node.x = nodeData.x;
+            if (nodeData.y !== undefined) node.y = nodeData.y;
+            
+            // 保留原始的componentPropertyDefinitions
+            if (nodeData.componentPropertyDefinitions && 
+                'componentPropertyDefinitions' in node) {
+              try {
+                // @ts-ignore - 设置组件属性定义
+                node.componentPropertyDefinitions = JSON.parse(
+                  JSON.stringify(nodeData.componentPropertyDefinitions)
+                );
+              } catch (error) {
+                console.warn('Failed to set componentPropertyDefinitions:', error);
+              }
+            }
+          } else {
+            console.warn(`未找到匹配的本地组件，componentKey: ${nodeData.componentKey}`);
+          }
+        } catch (localError) {
+          console.error('本地组件查找失败:', localError);
+        }
+        
+        // 如果本地查找失败，使用常规方法创建节点
+        if (!node) {
+          const factory = new NodeFactory();
+          node = await factory.createNode(nodeData.type, nodeData);
+        }
       } else {
         // 其他类型节点使用原来的逻辑
         const factory = new NodeFactory();
         node = await factory.createNode(nodeData.type, nodeData);
       }
-      
       if (!node) {
         console.warn(`Failed to create node of type: ${nodeData.type}`);
         continue;
@@ -269,14 +406,20 @@ export async function importNode(
           y: nodeData.relativeTransform ? nodeData.relativeTransform[1][2] : 0
         } : nodeBounds;
 
-        // 将子节点添加到队列
-        for (const childData of nodeData.children) {
-          queue.push({
-            data: childData,
-            parent: node as BaseNode & ChildrenMixin,
-            parentBounds: childParentBounds,
-            isGroupChild: nodeData.type === 'GROUP' // 标记是GROUP的子节点
-          });
+        // 只有在非INSTANCE、非COMPONENT且非COMPONENT_SET节点时才处理子节点
+        // 因为这些节点通过componentKey/clone导入时已经包含了子节点
+        if (nodeData.type !== 'INSTANCE' && nodeData.type !== 'COMPONENT' && nodeData.type !== 'COMPONENT_SET') {
+          // 将子节点添加到队列
+          for (const childData of nodeData.children) {
+            queue.push({
+              data: childData,
+              parent: node as BaseNode & ChildrenMixin,
+              parentBounds: childParentBounds,
+              isGroupChild: nodeData.type === 'GROUP' // 标记是GROUP的子节点
+            });
+          }
+        } else {
+          console.log(`跳过处理 ${nodeData.type} 节点的子元素，因为通过componentKey导入时已包含子节点`);
         }
       }
 
@@ -284,20 +427,20 @@ export async function importNode(
       if (node && (nodeData.layoutSizingHorizontal || nodeData.layoutSizingVertical)) {
         try {
           const nodeInfo = figma.getNodeById(node.id);
-          if (nodeInfo) {
+          if (nodeInfo && 'layoutSizingHorizontal' in nodeInfo) {
             if (nodeData.layoutSizingHorizontal) {
-              nodeInfo.layoutSizingHorizontal = nodeData.layoutSizingHorizontal;
+              (nodeInfo as any).layoutSizingHorizontal = nodeData.layoutSizingHorizontal;
             }
             if (nodeData.layoutSizingVertical) {
-              nodeInfo.layoutSizingVertical = nodeData.layoutSizingVertical;
+              (nodeInfo as any).layoutSizingVertical = nodeData.layoutSizingVertical;
             }
             if (nodeData.layoutPositioning) {
-              nodeInfo.layoutPositioning = nodeData.layoutPositioning;
-              nodeInfo.x = nodeData.x;
-              nodeInfo.y = nodeData.y;
+              (nodeInfo as any).layoutPositioning = nodeData.layoutPositioning;
+              (nodeInfo as any).x = nodeData.x;
+              (nodeInfo as any).y = nodeData.y;
             }
             if (nodeData.counterAxisSpacing) {
-              nodeInfo.counterAxisSpacing = nodeData.counterAxisSpacing;
+              (nodeInfo as any).counterAxisSpacing = nodeData.counterAxisSpacing;
             }
           }
         } catch (error) {

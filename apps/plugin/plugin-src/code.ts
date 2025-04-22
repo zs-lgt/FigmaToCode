@@ -16,6 +16,7 @@ import { exportNodes, getNodeExportImage } from 'backend/src/export';
 import { importFigmaJSON } from 'backend/src/importFigma';
 import { TextAnnotation } from './annotations/text';
 import { UXInfoAnnotationManager } from './annotations/uxInfoAnnotation';
+import { log } from "console";
 
 let userPluginSettings: PluginSettings;
 let isCodeGenerationEnabled = true;  // 添加代码生成状态控制
@@ -438,7 +439,8 @@ const standardMode = async () => {
       })();
     } else if (msg.type === 'export-nodes') {
       const nodes = figma.currentPage.children;
-      exportNodes(nodes, msg.optimize).then(async nodesData => {
+      
+      exportNodes(nodes, msg.optimize, false).then(async nodesData => {
         const { nodesInfo, description, images, optimize } = nodesData;
         const imagesData = [];
         for (const imageId of images) {
@@ -451,7 +453,7 @@ const standardMode = async () => {
             });
           }
         }
-
+        
         // 发送导出结果到UI
         figma.ui.postMessage({
           type: "export-nodes-result",
@@ -478,6 +480,7 @@ const standardMode = async () => {
             });
           }
         }
+
         // 发送所有数据
         figma.ui.postMessage({
           type: "export-nodes-result",

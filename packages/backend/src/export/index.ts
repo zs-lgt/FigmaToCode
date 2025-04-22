@@ -11,6 +11,40 @@ export { getNodeExportImage };
 
 // 递归处理节点及其子节点
 const processNode = async (node: SceneNode, imageDataMap: Map<string, string> = new Map()) => {
+  // 如果是COMPONENT_SET节点，返回包含key和属性定义的信息
+  if (node.type === 'COMPONENT_SET') {
+    const processedNode = getNodeInfo(node);
+    processedNode.componentKey = node.key;
+    processedNode.componentPropertyDefinitions = node.componentPropertyDefinitions;
+    
+    // 处理子节点
+    if ('children' in node && node.children) {
+      processedNode.children = await Promise.all(
+        node.children.map(child => processNode(child, imageDataMap))
+      );
+    }
+    return processedNode;
+  }
+
+  // 如果是COMPONENT节点，返回包含key的信息
+  if (node.type === 'COMPONENT') {
+    const processedNode = getNodeInfo(node);
+    processedNode.componentKey = node.key;
+    
+    // 只有当父节点不是COMPONENT_SET时，才添加componentPropertyDefinitions
+    if (!node.parent || node.parent.type !== 'COMPONENT_SET') {
+      processedNode.componentPropertyDefinitions = node.componentPropertyDefinitions;
+    }
+    
+    // 处理子节点
+    if ('children' in node && node.children) {
+      processedNode.children = await Promise.all(
+        node.children.map(child => processNode(child, imageDataMap))
+      );
+    }
+    return processedNode;
+  }
+
   // 如果是INSTANCE节点，返回简化信息
   if (node.type === 'INSTANCE') {
     const instanceNode = node as InstanceNode;
@@ -90,7 +124,7 @@ export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean
       }
     });
   }
-
+  
   // 处理所有节点
   for (const node of nodes) {
     try {
@@ -104,7 +138,7 @@ export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean
       if (filterSymbols && !node.name.startsWith('#')) {
         continue;
       }
-
+      
       // 处理节点及其子节点，同时传入图片数据映射
       const processedNode = await processNode(node, imageDataMap);
       if (processedNode) {
@@ -118,7 +152,8 @@ export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean
       console.error(`处理节点 ${node.name} 时出错:`, error);
     }
   }
-
+  console.log(333, exportedNodes);
+  
   return {
     nodesInfo: exportedNodes,
     description,
