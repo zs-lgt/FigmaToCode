@@ -1,6 +1,21 @@
 import { NodeFactory } from '../nodeFactory';
 import { BaseNodeCreator } from '../nodeFactory/baseNodeCreator'
 
+// 添加组件属性类型定义
+interface ComponentPropertyDefinition {
+  type: 'BOOLEAN' | 'TEXT' | 'INSTANCE_SWAP' | 'VARIANT';
+  name: string;
+  defaultValue?: string | boolean;
+  preferredValues?: Array<{
+    type: 'COMPONENT_SET' | 'COMPONENT';
+    key: string;
+  }>;
+}
+
+interface ComponentPropertyDefinitions {
+  [key: string]: ComponentPropertyDefinition;
+}
+
 // 新增：字体映射表，用于替换找不到的字体
 const fontFallbacks: { [key: string]: { family: string, style: string } } = {
   'THS JinRongTi': { family: 'Inter', style: 'Regular' },
@@ -262,22 +277,18 @@ export async function importNode(
           if (localComponentSet) {
             // 使用找到的组件集
             node = localComponentSet.clone();
+            console.log(`找到本地组件集: ${localComponentSet.name}`);
             
             // 保持原有的位置属性
             if (nodeData.x !== undefined) node.x = nodeData.x;
             if (nodeData.y !== undefined) node.y = nodeData.y;
             
-            // 保留原始的componentPropertyDefinitions
-            if (nodeData.componentPropertyDefinitions && 
-                'componentPropertyDefinitions' in node) {
-              try {
-                // @ts-ignore - 设置组件属性定义
-                node.componentPropertyDefinitions = JSON.parse(
-                  JSON.stringify(nodeData.componentPropertyDefinitions)
-                );
-              } catch (error) {
-                console.warn('Failed to set componentPropertyDefinitions:', error);
-              }
+            // 设置组件属性
+            if (nodeData.componentPropertyDefinitions) {
+              await setComponentProperties(
+                node as ComponentNode | ComponentSetNode,
+                nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
+              );
             }
           } else {
             console.warn(`未找到匹配的本地组件集，componentKey: ${nodeData.componentKey}`);
@@ -290,38 +301,15 @@ export async function importNode(
         if (!node) {
           const factory = new NodeFactory();
           node = await factory.createNode(nodeData.type, nodeData);
-        }
-        
-        // 将节点添加到父节点
-        if (node && parentNode) {
-          parentNode.appendChild(node);
-        }
-        
-        // 如果成功创建了节点，设置基本属性并执行回调
-        if (node) {
-          // 设置基本属性
-          const creator = new BaseNodeCreator();
-          creator.setBaseProperties(node, nodeData);
-          creator.setGeometry(node, nodeData, bounds);
-          creator.setAppearance(node, nodeData);
           
-          // 执行回调
-          if (callback) {
-            callback(nodeData.id, node, nodeData);
+          // 使用通用方法设置组件属性
+          if (node && nodeData.componentPropertyDefinitions && 
+              (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET')) {
+            await setComponentProperties(
+              node as ComponentNode | ComponentSetNode,
+              nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
+            );
           }
-          
-          // 保存根节点引用
-          if (rootNode === null && queue.length === 0) {
-            rootNode = node;
-          }
-          
-          // 添加到映射表
-          if (nodeData.id) {
-            nodeMap.set(nodeData.id, node);
-          }
-          
-          // 对于COMPONENT_SET，跳过处理子节点
-          continue;
         }
       }
       // 处理COMPONENT节点 - 通过componentKey导入
@@ -342,22 +330,18 @@ export async function importNode(
           if (localComponent) {
             // 使用找到的组件
             node = localComponent.clone();
+            console.log(`找到并克隆本地组件: ${localComponent.name}`);
             
             // 保持原有的位置属性
             if (nodeData.x !== undefined) node.x = nodeData.x;
             if (nodeData.y !== undefined) node.y = nodeData.y;
             
-            // 保留原始的componentPropertyDefinitions
-            if (nodeData.componentPropertyDefinitions && 
-                'componentPropertyDefinitions' in node) {
-              try {
-                // @ts-ignore - 设置组件属性定义
-                node.componentPropertyDefinitions = JSON.parse(
-                  JSON.stringify(nodeData.componentPropertyDefinitions)
-                );
-              } catch (error) {
-                console.warn('Failed to set componentPropertyDefinitions:', error);
-              }
+            // 设置组件属性
+            if (nodeData.componentPropertyDefinitions) {
+              await setComponentProperties(
+                node as ComponentNode | ComponentSetNode,
+                nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
+              );
             }
           } else {
             console.warn(`未找到匹配的本地组件，componentKey: ${nodeData.componentKey}`);
@@ -370,6 +354,15 @@ export async function importNode(
         if (!node) {
           const factory = new NodeFactory();
           node = await factory.createNode(nodeData.type, nodeData);
+          
+          // 使用通用方法设置组件属性
+          if (node && nodeData.componentPropertyDefinitions && 
+              (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET')) {
+            await setComponentProperties(
+              node as ComponentNode | ComponentSetNode,
+              nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
+            );
+          }
         }
       } else {
         // 其他类型节点使用原来的逻辑
@@ -627,5 +620,44 @@ export async function importFigmaJSON(
     console.error('Error importing Figma JSON:', error);
     figma.notify(`导入失败: ${error.message}`, { error: true });
     throw error;
+  }
+}
+
+// 新增：设置组件属性的通用方法
+async function setComponentProperties(
+  node: ComponentNode | ComponentSetNode,
+  propertyDefinitions: ComponentPropertyDefinitions
+): Promise<void> {
+  try {
+    for (const [propertyName, propertyDef] of Object.entries(propertyDefinitions)) {
+      try {
+        // 根据不同的属性类型处理
+        switch(propertyDef.type) {
+          case 'BOOLEAN':
+          case 'TEXT':
+          case 'INSTANCE_SWAP':
+            console.log(123, propertyName);
+            
+            node.editComponentProperty(propertyName, {
+              defaultValue: propertyDef.defaultValue,
+            });
+            break;
+          case 'VARIANT':
+            // VARIANT 类型只支持修改 name
+            node.editComponentProperty(propertyName, {
+              name: propertyDef.name,
+              defaultValue: undefined,
+              preferredValues: []
+            });
+            break;
+          default:
+            console.warn(`不支持的组件属性类型: ${propertyDef.type}`);
+        }
+      } catch (propError) {
+        console.warn(`设置组件属性 ${propertyName} 失败:`, propError);
+      }
+    }
+  } catch (error) {
+    console.warn('设置组件属性定义失败:', error);
   }
 }
