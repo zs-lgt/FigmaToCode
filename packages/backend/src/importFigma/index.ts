@@ -165,6 +165,21 @@ interface GroupConversionTask {
   nodeData: any;
 }
 
+// 新增：检查节点是否支持layoutSizing属性的辅助函数
+function canSetLayoutSizing(node: SceneNode): boolean {
+  // 如果节点是自动布局框架，则可以设置
+  if ('layoutMode' in node && node.layoutMode !== 'NONE') {
+    return true;
+  }
+  
+  // 如果节点是自动布局框架的子节点，也可以设置
+  if (node.parent && 'layoutMode' in node.parent && node.parent.layoutMode !== 'NONE') {
+    return true;
+  }
+  
+  return false;
+}
+
 // Main function to import nodes - 优化版本
 export async function importNode(
   data: any, 
@@ -460,6 +475,90 @@ export async function importNode(
           }
         } catch (error) {
           console.warn(`[${node.name}] Error setting layoutSizing:`, error);
+        }
+      }
+      
+      // 新增：如果节点没有指定宽度或高度，设置为自动布局
+      if (node && !nodeData.layoutMode && (nodeData.width === undefined || nodeData.height === undefined)) {
+        try {
+          // 文本节点只需要设置自适应宽高，不需要设置为自动布局容器
+          if (nodeData.type === 'TEXT') {
+            // 先检查是否支持设置layoutSizing
+            const canSet = canSetLayoutSizing(node);
+            if (canSet) {
+              console.log(`为文本节点 ${node.name} 设置宽高自适应`);
+              
+              // 对于文本节点，设置宽高为自适应
+              if (nodeData.width === undefined) {
+                (node as any).layoutSizingHorizontal = "HUG";
+              }
+              
+              if (nodeData.height === undefined) {
+                (node as any).layoutSizingVertical = "HUG";
+              }
+              
+              console.log(`文本节点 ${node.name} 已设置宽高自适应`);
+            } else {
+              console.log(`文本节点 ${node.name} 不支持设置layoutSizing，需要先设置为自动布局`);
+              // 对于不支持直接设置的节点，先将它设置为自动布局框架
+              if ('layoutMode' in node) {
+                (node as any).layoutMode = "HORIZONTAL";
+                (node as any).counterAxisSizingMode = "AUTO";
+                
+                if (nodeData.width === undefined) {
+                  (node as any).layoutSizingHorizontal = "HUG";
+                }
+                
+                if (nodeData.height === undefined) {
+                  (node as any).layoutSizingVertical = "HUG";
+                }
+              }
+            }
+          }
+          // 实例节点只设置自适应宽高，保留原有布局结构
+          else if (nodeData.type === 'INSTANCE') {
+            // 先设置为自动布局，然后再设置尺寸
+            if ('layoutMode' in node) {
+              console.log(`为实例节点 ${node.name} 设置自动布局`);
+              
+              // 先设置为自动布局
+              (node as any).layoutMode = "HORIZONTAL";
+              (node as any).counterAxisSizingMode = "AUTO";
+              
+              // 然后设置自适应尺寸
+              if (nodeData.width === undefined) {
+                console.log(`实例节点 ${node.name} 设置水平自适应`);
+                (node as any).layoutSizingHorizontal = "HUG";
+              }
+              
+              if (nodeData.height === undefined) {
+                console.log(`实例节点 ${node.name} 设置垂直自适应`);
+                (node as any).layoutSizingVertical = "HUG";
+              }
+            }
+          }
+          // 非文本/实例节点且支持自动布局，设置为自动布局容器
+          else if ('layoutMode' in node) {
+            console.log(`为节点 ${node.name} 设置自动布局属性（宽高未指定）`);
+            
+            // 设置水平自动布局
+            (node as any).layoutMode = "HORIZONTAL";
+            (node as any).counterAxisSizingMode = "AUTO";
+            
+            // 设置宽高为自适应
+            if (nodeData.width === undefined) {
+              (node as any).layoutSizingHorizontal = "HUG";
+            }
+            
+            if (nodeData.height === undefined) {
+              (node as any).layoutSizingVertical = "HUG";
+            }
+            
+            // 记录自动布局设置
+            console.log(`节点 ${node.name} 已设置为自动布局：水平方向，宽高自适应`);
+          }
+        } catch (error) {
+          console.warn(`[${node.name}] 设置自动布局失败:`, error);
         }
       }
     }
