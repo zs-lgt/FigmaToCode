@@ -3,32 +3,20 @@ import { TextAnnotation } from './text';
 type UXInfo = {
   hover?: string | null;
   click?: string | null;
-} | string;
+} | string | string[];
 
 interface NodeCache {
   [key: string]: SceneNode;
 }
-
+const sleep = (ms: number): Promise<void> => {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
 export class UXInfoAnnotationManager {
   private textAnnotation: TextAnnotation;
   private nodeCache: NodeCache = {};
 
   constructor(textAnnotation: TextAnnotation) {
     this.textAnnotation = textAnnotation;
-    this.initializeNodeCache();
-  }
-
-  private initializeNodeCache() {
-    // 初始化缓存，遍历一次所有节点并建立映射
-    const traverseNodes = (node: SceneNode) => {
-      this.nodeCache[node.id] = node;
-      if ("children" in node) {
-        (node.children as SceneNode[]).forEach(traverseNodes);
-      }
-    };
-    
-    // 从当前页面开始遍历
-    figma.currentPage.children.forEach(traverseNodes);
   }
 
   private formatInteractionText(uxInfo: UXInfo): string {
@@ -57,7 +45,7 @@ export class UXInfoAnnotationManager {
 
   public async processUXInfo(uxInfoData: Record<string, UXInfo>) {
     for (const [nodeId, info] of Object.entries(uxInfoData)) {
-      const node = this.nodeCache[nodeId];
+      const node = figma.getNodeById(nodeId);
       if (!node) {
         console.warn(`Node with ID ${nodeId} not found`);
         continue;
@@ -70,6 +58,21 @@ export class UXInfoAnnotationManager {
 
       const annotationText = this.formatInteractionText(info);
       await this.textAnnotation.create(node, annotationText);
+    }
+  }
+
+  // 处理UX信息V2版本，支持数组和base64图片
+  public async processUXInfoV2(uxInfoData: Record<string, UXInfo>) {
+    for (const [nodeId, info] of Object.entries(uxInfoData)) {
+      const node = figma.getNodeById(nodeId);
+      console.log('node', node);
+      if (!node) {
+        console.warn(`Node with ID ${nodeId} not found`);
+        continue;
+      }
+
+      await this.textAnnotation.create(node, info as string[]);
+      await sleep(100);
     }
   }
 }

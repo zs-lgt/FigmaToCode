@@ -415,7 +415,6 @@ export async function importNode(
       
       // 检查是否有comment字段，并调用回调
       if (callback) {
-        console.log('nodeData', nodeData)
         callback(nodeData.id, node, nodeData);
       }
 

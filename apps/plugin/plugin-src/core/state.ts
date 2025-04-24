@@ -14,10 +14,10 @@ export class PluginState {
   private _sourceMarkerMap: Map<string, string> = new Map();
 
   // 缓存变量
-  private _connectionGroupsCache: GroupNode[] = [];
-  private _textAnnotationGroupsCache: GroupNode[] = [];
-  private _hotspotAnnotationGroupsCache: GroupNode[] = [];
-  private _sourceAnnotationGroupsCache: GroupNode[] = [];
+  private _connectionGroupsCache: (GroupNode | FrameNode)[] = [];
+  private _textAnnotationGroupsCache: (GroupNode | FrameNode)[] = [];
+  private _hotspotAnnotationGroupsCache: (GroupNode | FrameNode)[] = [];
+  private _sourceAnnotationGroupsCache: (GroupNode | FrameNode)[] = [];
   private _hotspotCache: SceneNode[] = [];
   private _cacheInitialized: boolean = false;
   private _cacheDirty: boolean = true;
@@ -120,6 +120,12 @@ export class PluginState {
       "type",
       "hotspot-annotation"
     );
+    // 添加创建时间戳，用于处理复制的节点
+    this.safeSetPluginData(
+      hotspotAnnotationGroup,
+      "creation-timestamp",
+      Date.now().toString()
+    );
 
     // 3. 如果有源标注组，设置关联
     if (sourceGroup) {
@@ -129,6 +135,12 @@ export class PluginState {
         hotspotAnnotationGroup,
         "source-group-id",
         sourceGroup.id
+      );
+      // 添加创建时间戳，用于处理复制的节点
+      this.safeSetPluginData(
+        sourceGroup,
+        "creation-timestamp",
+        Date.now().toString()
       );
       this._sourceAnnotationGroupsCache.push(sourceGroup);
       this._nodeTypeMap.set(sourceGroup.id, "source");
@@ -147,7 +159,136 @@ export class PluginState {
     `);
   }
 
-  // 修改：初始化缓存方法，不再遍历查找热区
+  // 新增：注册文本标注的方法
+  public registerTextAnnotation(
+    annotationGroup: GroupNode | FrameNode,
+    sourceGroup: GroupNode | FrameNode
+  ): void {
+    console.log(`\n=== 注册文本标注到缓存 ===`);
+    console.log(`标注组ID: ${annotationGroup.id}, 源组ID: ${sourceGroup.id}`);
+
+    // 设置标注组的标识
+    this.safeSetPluginData(annotationGroup, "type", "text-annotation");
+    this.safeSetPluginData(sourceGroup, "type", "source");
+
+    // 添加创建时间戳，用于处理复制的节点
+    this.safeSetPluginData(annotationGroup, "creation-timestamp", Date.now().toString());
+    this.safeSetPluginData(sourceGroup, "creation-timestamp", Date.now().toString());
+
+    // 设置相互关联
+    this.safeSetPluginData(annotationGroup, "source-group-id", sourceGroup.id);
+    this.safeSetPluginData(sourceGroup, "annotation-group-id", annotationGroup.id);
+
+    // 直接添加到缓存
+    this._textAnnotationGroupsCache.push(annotationGroup);
+    this._sourceAnnotationGroupsCache.push(sourceGroup);
+    this._nodeTypeMap.set(annotationGroup.id, "text-annotation");
+    this._nodeTypeMap.set(sourceGroup.id, "source");
+
+    console.log(`当前缓存状态:
+      文本标注组数量: ${this._textAnnotationGroupsCache.length}
+      源标注组数量: ${this._sourceAnnotationGroupsCache.length}
+    `);
+  }
+
+  // 新增：检测并处理可能的重复节点(处理复制过的节点)
+  private detectAndHandleDuplicateNodes(): void {
+    try {
+      // 使用创建时间戳检测复制的节点
+      const processedIds = new Set<string>();
+      const annotations = [...this._textAnnotationGroupsCache, ...this._hotspotAnnotationGroupsCache];
+
+      for (const anno of annotations) {
+        if (processedIds.has(anno.id)) continue;
+
+        const timestamp = this.safeGetPluginData(anno, "creation-timestamp");
+        if (!timestamp) continue;
+
+        // 寻找可能有相同时间戳的其他节点(复制出来的一般会有相同时间戳)
+        const possibleDuplicates = annotations.filter(node =>
+          node.id !== anno.id &&
+          this.safeGetPluginData(node, "creation-timestamp") === timestamp
+        );
+
+        // 如果找到可能的重复，处理它们
+        for (const duplicate of possibleDuplicates) {
+          const isHotspot = this.safeGetPluginData(duplicate, "type") === "hotspot-annotation";
+          const number = parseInt(duplicate.name.split("-")[1]?.split("/")[0]) || 0;
+
+          // 确保编号唯一，给复制的标注分配新的编号
+          const newNumber = this._annotationCounter + 1;
+          this._annotationCounter = newNumber;
+
+          // 更新名称
+          const prefix = isHotspot ? "热区标注组" : "标注组";
+          const nameParts = duplicate.name.split("/");
+          const newName = `${prefix}-${newNumber}/${nameParts.slice(1).join("/")}`;
+          duplicate.name = newName;
+
+          // 更新内部文本
+          const textNodes = duplicate.findAll(node =>
+            node.type === "TEXT" && !isNaN(parseInt(node.characters))
+          ) as TextNode[];
+
+          for (const textNode of textNodes) {
+            // 只有当文本完全是数字时才更新
+            if (textNode.characters && /^\d+$/.test(textNode.characters)) {
+              textNode.characters = newNumber.toString();
+            }
+          }
+
+          // 更新frame的插件数据
+          const frame = duplicate.findOne(node =>
+            node.type === "FRAME" &&
+            (node.name === "标注框" || node.name === "热区标注框")
+          );
+
+          if (frame) {
+            this.safeSetPluginData(frame, "annotation-number", newNumber.toString());
+          }
+
+          // 更新关联的源标注组
+          const sourceGroupId = this.safeGetPluginData(duplicate, "source-group-id");
+          if (sourceGroupId) {
+            const sourceGroup = this.findNodeById(sourceGroupId);
+            if (sourceGroup) {
+              const nameParts = sourceGroup.name.split("/");
+              const newSourceName = `源标注组-${newNumber}/${nameParts.slice(1).join("/")}`;
+              sourceGroup.name = newSourceName;
+
+              // 更新源标注组内的文本
+              const sourceTextNodes = (sourceGroup as GroupNode).findAll(node =>
+                node.type === "TEXT" && !isNaN(parseInt(node.characters))
+              ) as TextNode[];
+
+              for (const textNode of sourceTextNodes) {
+                // 只有当文本完全是数字时才更新
+                if (textNode.characters && /^\d+$/.test(textNode.characters)) {
+                  textNode.characters = newNumber.toString();
+                }
+              }
+
+              // 更新时间戳让它成为唯一标注
+              this.safeSetPluginData(sourceGroup, "creation-timestamp", Date.now().toString());
+            }
+          }
+
+          // 更新时间戳让它成为唯一标注
+          this.safeSetPluginData(duplicate, "creation-timestamp", Date.now().toString());
+
+          // 标记为已处理
+          processedIds.add(duplicate.id);
+        }
+
+        // 标记原始节点为已处理
+        processedIds.add(anno.id);
+      }
+    } catch (error) {
+      console.error(`检测处理重复节点时出错: ${error instanceof Error ? error.message : "未知错误"}`);
+    }
+  }
+
+  // 修改：初始化缓存方法
   private initCache(): void {
     if (this._cacheInitialized && !this._cacheDirty && !this.isCacheExpired()) {
       return;
@@ -166,7 +307,7 @@ export class PluginState {
 
       // 只处理顶层节点，查找标注组
       for (const node of figma.currentPage.children) {
-        if (node.type === "GROUP") {
+        if (node.type === "GROUP" || node.type === "FRAME") {
           // 首先通过名称判断
           if (node.name.startsWith("源标注组")) {
             this._sourceAnnotationGroupsCache.push(node);
@@ -208,6 +349,9 @@ export class PluginState {
           }
         }
       }
+
+      // 处理可能复制出来的重复节点
+      this.detectAndHandleDuplicateNodes();
 
       this._cacheInitialized = true;
       this._cacheDirty = false;
@@ -340,25 +484,25 @@ export class PluginState {
   }
 
   // 获取连接线组缓存
-  public getConnectionGroups(): GroupNode[] {
+  public getConnectionGroups(): (GroupNode | FrameNode)[] {
     this.initCache();
     return [...this._connectionGroupsCache];
   }
 
   // 获取文本标注组缓存
-  public getTextAnnotationGroups(): GroupNode[] {
+  public getTextAnnotationGroups(): (GroupNode | FrameNode)[] {
     this.initCache();
     return [...this._textAnnotationGroupsCache];
   }
 
   // 获取热区标注组缓存
-  public getHotspotAnnotationGroups(): GroupNode[] {
+  public getHotspotAnnotationGroups(): (GroupNode | FrameNode)[] {
     this.initCache();
     return [...this._hotspotAnnotationGroupsCache];
   }
 
   // 获取源标注组缓存
-  public getSourceAnnotationGroups(): GroupNode[] {
+  public getSourceAnnotationGroups(): (GroupNode | FrameNode)[] {
     this.initCache();
     return [...this._sourceAnnotationGroupsCache];
   }
@@ -377,10 +521,10 @@ export class PluginState {
 
   // 获取按类别分组的节点缓存
   public getCategoryNodeCache(): {
-    connections: GroupNode[];
-    textAnnotations: GroupNode[];
-    hotspotAnnotations: GroupNode[];
-    sourceAnnotations: GroupNode[];
+    connections: (GroupNode | FrameNode)[];
+    textAnnotations: (GroupNode | FrameNode)[];
+    hotspotAnnotations: (GroupNode | FrameNode)[];
+    sourceAnnotations: (GroupNode | FrameNode)[];
   } {
     this.initCache();
     return {
@@ -514,7 +658,7 @@ export class PluginState {
         this._hotspotAnnotationGroupsCache.filter(
           (group) => group.id !== hotspotAnnotationGroup.id
         );
-      
+
       // 从_nodeTypeMap中移除
       this._nodeTypeMap.delete(hotspotAnnotationGroup.id);
 
@@ -543,10 +687,9 @@ export class PluginState {
   // 修改：更新所有标注编号方法，添加热区处理
   public async updateAllAnnotationNumbers(): Promise<void> {
     try {
-      console.log("\n=== 开始更新标注编号 ===");
+      console.log(`\n=== 开始更新所有标注编号 ===`);
 
-      // 强制刷新缓存以确保获取最新数据
-      this.invalidateCache();
+      // 初始化缓存
       this.initCache();
 
       // 获取所有标注组
@@ -577,17 +720,26 @@ export class PluginState {
           const nameParts = group.name.split("/");
 
           // 更新组名
-          const newName = `${prefix}-${currentNumber}/${nameParts[1]}/${nameParts[2]}`;
+          const newName = `${prefix}-${currentNumber}/${nameParts.slice(1).join("/")}`;
           console.log(`更新组名: ${group.name} -> ${newName}`);
           group.name = newName;
 
-          // 更新组内的文本节点
+          // 更新数字标签 - 仅更新纯数字标签
           const textNodes = group.findAll(
             (node) => node.type === "TEXT"
           ) as TextNode[];
+
           for (const textNode of textNodes) {
-            if (!isNaN(parseInt(textNode.characters))) {
-              textNode.characters = String(currentNumber);
+            // 只有当文本完全是数字时才更新
+            if (textNode.characters && /^\d+$/.test(textNode.characters)) {
+              // 通过节点名称判断是否是标注编号
+              const isAnnotationNumber =
+                textNode.name === "目标标记数字" ||
+                textNode.name === "标注编号" ||
+                textNode.name === "热区标注编号";
+              if (isAnnotationNumber) {
+                textNode.characters = String(currentNumber);
+              }
             }
           }
 
@@ -629,16 +781,17 @@ export class PluginState {
             const sourceGroup = figma.getNodeById(sourceGroupId) as GroupNode;
             if (sourceGroup) {
               const sourceNameParts = sourceGroup.name.split("/");
-              const newSourceName = `源标注组-${currentNumber}/${sourceNameParts[1]}/${sourceNameParts[2]}`;
+              const newSourceName = `源标注组-${currentNumber}/${sourceNameParts.slice(1).join("/")}`;
               sourceGroup.name = newSourceName;
 
-              // 更新源标注组内的文本节点
+              // 更新源标注组内的数字标签
               const sourceTextNodes = sourceGroup.findAll(
                 (node) => node.type === "TEXT"
               ) as TextNode[];
 
               for (const textNode of sourceTextNodes) {
-                if (!isNaN(parseInt(textNode.characters))) {
+                // 只有当文本完全是数字时才更新
+                if (textNode.characters && /^\d+$/.test(textNode.characters)) {
                   textNode.characters = String(currentNumber);
                 }
               }

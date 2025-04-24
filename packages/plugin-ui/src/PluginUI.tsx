@@ -139,7 +139,12 @@ export const PluginUI = (props: PluginUIProps) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showHtml2FigmaModal, setShowHtml2FigmaModal] = useState(false);
   const [html2figmaInput, setHtml2figmaInput] = useState('');
+  const [showUiUxModal, setShowUiUxModal] = useState(false);
+  const [uiJsonFile, setUiJsonFile] = useState<File | null>(null);
+  const [uxJsonFile, setUxJsonFile] = useState<File | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const uiJsonFileRef = useRef<HTMLInputElement>(null);
+  const uxJsonFileRef = useRef<HTMLInputElement>(null);
 
   // 处理插件消息
   useEffect(() => {
@@ -487,6 +492,106 @@ export const PluginUI = (props: PluginUIProps) => {
     }
   };
 
+  const handleImportUiUxClick = () => {
+    setShowUiUxModal(true);
+  };
+  
+  const handleUiFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUiJsonFile(file);
+      const fileNameElement = document.getElementById('ui-file-name');
+      if (fileNameElement) {
+        fileNameElement.textContent = `已选择: ${file.name}`;
+      }
+    }
+  };
+  
+  const handleUxFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUxJsonFile(file);
+      const fileNameElement = document.getElementById('ux-file-name');
+      if (fileNameElement) {
+        fileNameElement.textContent = `已选择: ${file.name}`;
+      }
+    }
+  };
+  
+  const handleImportUiUxSubmit = () => {
+    if (!uiJsonFile) {
+      alert('请先选择UI JSON文件');
+      return;
+    }
+    
+    // 设置加载状态
+    setIsLoading(true);
+    
+    // 开始读取UI文件
+    const uiReader = new FileReader();
+    uiReader.onload = (uiEvent) => {
+      try {
+        const uiJsonContent = uiEvent.target?.result as string;
+        
+        // 如果有UX文件，也读取
+        if (uxJsonFile) {
+          const uxReader = new FileReader();
+          uxReader.onload = (uxEvent) => {
+            try {
+              const uxJsonContent = uxEvent.target?.result as string;
+              
+              // 发送两个文件内容到插件
+              window.parent.postMessage(
+                { 
+                  pluginMessage: { 
+                    type: 'import-ui-ux-json',
+                    data: {
+                      uiJson: uiJsonContent,
+                      uxJson: uxJsonContent
+                    }
+                  } 
+                },
+                "*"
+              );
+              
+              // 关闭模态框并清空状态
+              setShowUiUxModal(false);
+              setUiJsonFile(null);
+              setUxJsonFile(null);
+              
+            } catch (error) {
+              setIsLoading(false);
+              alert('UX JSON格式无效');
+            }
+          };
+          uxReader.readAsText(uxJsonFile);
+        } else {
+          // 只发送UI文件内容到插件
+          window.parent.postMessage(
+            { 
+              pluginMessage: { 
+                type: 'import-ui-ux-json',
+                data: {
+                  uiJson: uiJsonContent,
+                  uxJson: null
+                }
+              } 
+            },
+            "*"
+          );
+          
+          // 关闭模态框并清空状态
+          setShowUiUxModal(false);
+          setUiJsonFile(null);
+        }
+      } catch (error) {
+        setIsLoading(false);
+        alert('UI JSON格式无效');
+      }
+    };
+    uiReader.readAsText(uiJsonFile);
+  };
+
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
@@ -578,64 +683,169 @@ export const PluginUI = (props: PluginUIProps) => {
             >
               Html2Figma
             </button>
+
+            <button
+              onClick={handleImportUiUxClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              导入UI&UX
+            </button>
           </div>
         </div>
       </div>
 
-      {/* UX Import Modal */}
-      {showUxImportModal && (
-        <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+      {/* UI+UX Import Modal */}
+      {showUiUxModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium dark:text-white">导入UI+UX</h3>
+              {isLoading && (
+                <div className="flex items-center text-sm text-blue-600 dark:text-blue-400">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  导入中...
+                </div>
+              )}
             </div>
-            <div className="inline-block px-4 pt-5 pb-4 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
-              <div>
-                <h3 className="text-lg font-medium leading-6 text-gray-900">导入UX交互信息</h3>
-                <div className="mt-2">
-                  <p className="text-sm text-gray-500">请选择UX交互信息的JSON文件</p>
-                </div>
-                <div className="mt-4">
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                          try {
-                            const jsonData = JSON.parse(event.target?.result as string);
-                            window.parent.postMessage(
-                              { 
-                                pluginMessage: { 
-                                  type: 'import-ux-info',
-                                  data: jsonData
-                                } 
-                              },
-                              "*"
-                            );
-                            setShowUxImportModal(false);
-                          } catch (error) {
-                            alert('无效的JSON文件');
-                          }
-                        };
-                        reader.readAsText(file);
+            
+            <div className="space-y-6">
+              {/* UI JSON 上传区域 */}
+              <div className="space-y-2">
+                <h4 className="text-base font-medium dark:text-gray-200">UI JSON（必需）</h4>
+                <div 
+                  className="border-2 border-dashed rounded-md p-4 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.classList.add('border-blue-500');
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.classList.remove('border-blue-500');
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.classList.remove('border-blue-500');
+                    
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                      const file = e.dataTransfer.files[0];
+                      if (file.type === 'application/json' || file.name.endsWith('.json')) {
+                        setUiJsonFile(file);
+                        const fileNameElement = document.getElementById('ui-file-name');
+                        if (fileNameElement) {
+                          fileNameElement.textContent = `已选择: ${file.name}`;
+                        }
+                      } else {
+                        alert('请上传JSON文件');
                       }
-                    }}
-                    className="w-full p-2 mt-1 border border-gray-300 rounded-md"
-                  />
+                    }
+                  }}
+                >
+                  <div className="flex flex-col items-center justify-center space-y-2 text-gray-500 dark:text-gray-400">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="text-sm">点击上传或拖拽UI JSON文件至此处</p>
+                    <input
+                      type="file"
+                      accept=".json"
+                      ref={uiJsonFileRef}
+                      onChange={handleUiFileChange}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => uiJsonFileRef.current?.click()}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      选择UI JSON文件
+                    </button>
+                  </div>
+                </div>
+                <div id="ui-file-name" className="text-sm text-gray-600 dark:text-gray-400">
+                  {uiJsonFile && `已选择: ${uiJsonFile.name}`}
                 </div>
               </div>
-              <div className="mt-5 sm:mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowUxImportModal(false)}
-                  className="inline-flex justify-center w-full px-4 py-2 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
+              
+              {/* UX JSON 上传区域 */}
+              <div className="space-y-2">
+                <h4 className="text-base font-medium dark:text-gray-200">UX JSON（可选）</h4>
+                <div 
+                  className="border-2 border-dashed rounded-md p-4 dark:border-gray-600 hover:border-green-500 dark:hover:border-green-400 transition-colors"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.classList.add('border-green-500');
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.classList.remove('border-green-500');
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.classList.remove('border-green-500');
+                    
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                      const file = e.dataTransfer.files[0];
+                      if (file.type === 'application/json' || file.name.endsWith('.json')) {
+                        setUxJsonFile(file);
+                        const fileNameElement = document.getElementById('ux-file-name');
+                        if (fileNameElement) {
+                          fileNameElement.textContent = `已选择: ${file.name}`;
+                        }
+                      } else {
+                        alert('请上传JSON文件');
+                      }
+                    }
+                  }}
                 >
-                  取消
-                </button>
+                  <div className="flex flex-col items-center justify-center space-y-2 text-gray-500 dark:text-gray-400">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="text-sm">点击上传或拖拽UX JSON文件至此处（可选）</p>
+                    <input
+                      type="file"
+                      accept=".json"
+                      ref={uxJsonFileRef}
+                      onChange={handleUxFileChange}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => uxJsonFileRef.current?.click()}
+                      className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      选择UX JSON文件
+                    </button>
+                  </div>
+                </div>
+                <div id="ux-file-name" className="text-sm text-gray-600 dark:text-gray-400">
+                  {uxJsonFile && `已选择: ${uxJsonFile.name}`}
+                </div>
               </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowUiUxModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                disabled={isLoading}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleImportUiUxSubmit}
+                className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                disabled={isLoading || !uiJsonFile}
+              >
+                {isLoading ? '导入中...' : '导入'}
+              </button>
             </div>
           </div>
         </div>
@@ -1002,6 +1212,65 @@ export const PluginUI = (props: PluginUIProps) => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+
+      {/* UX Import Modal */}
+      {showUxImportModal && (
+        <div className="fixed inset-0 z-10 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div className="inline-block px-4 pt-5 pb-4 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div>
+                <h3 className="text-lg font-medium leading-6 text-gray-900">导入UX交互信息</h3>
+                <div className="mt-2">
+                  <p className="text-sm text-gray-500">请选择UX交互信息的JSON文件</p>
+                </div>
+                <div className="mt-4">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          try {
+                            const jsonData = JSON.parse(event.target?.result as string);
+                            window.parent.postMessage(
+                              { 
+                                pluginMessage: { 
+                                  type: 'import-ux-info',
+                                  data: jsonData
+                                } 
+                              },
+                              "*"
+                            );
+                            setShowUxImportModal(false);
+                          } catch (error) {
+                            alert('无效的JSON文件');
+                          }
+                        };
+                        reader.readAsText(file);
+                      }
+                    }}
+                    className="w-full p-2 mt-1 border border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowUxImportModal(false)}
+                  className="inline-flex justify-center w-full px-4 py-2 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:text-sm"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

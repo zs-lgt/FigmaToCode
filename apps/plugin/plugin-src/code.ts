@@ -16,7 +16,6 @@ import { exportNodes, getNodeExportImage } from 'backend/src/export';
 import { importFigmaJSON } from 'backend/src/importFigma';
 import { TextAnnotation } from './annotations/text';
 import { UXInfoAnnotationManager } from './annotations/uxInfoAnnotation';
-import { log } from "console";
 
 let userPluginSettings: PluginSettings;
 let isCodeGenerationEnabled = true;  // 添加代码生成状态控制
@@ -84,6 +83,29 @@ const safeRun = (settings: PluginSettings) => {
     }
   }
 };
+
+// 从UX数据中提取评论信息，映射到节点ID
+function extractCommentsFromUxData(uxData: any): Map<string, string[]> {
+  const commentsMap = new Map<string, string[]>();
+  const { description = [] } = uxData
+  console.log('uxData', description);
+  // 处理UX数据格式1：{ nodeId: { comments: string[] } }
+  if (description.length) {
+    for (const item of description) {
+      const { id, comments } = item;
+      commentsMap.set(id, comments);
+    };
+  }
+  return commentsMap;
+}
+
+// 遍历树
+function traverseTree(node: any, callback: (node: SceneNode) => void) {
+  callback(node);
+  if (node.children) {
+    node.children.forEach(child => traverseTree(child, callback));
+  }
+}
 
 const standardMode = async () => {
   figma.showUI(__html__, { 
@@ -529,9 +551,100 @@ const standardMode = async () => {
           sendResultMessage(false, "html2figma", `HTML转换失败: ${errorMessage}`);
         }
       })();
-    }
-    if (msg.type === 'resize') {
+    } else if (msg.type === 'resize') {
       figma.ui.resize(msg.width, msg.height);
+    } else if (msg.type === 'import-ui-ux-json') {
+      try {
+        const { uiJson, uxJson } = msg.data;
+        
+        if (!uiJson) {
+          throw new Error('UI JSON数据不能为空');
+        }
+        const uiData = JSON.parse(uiJson);
+
+        // 解析UX数据
+        let uxCommentsMap: Map<string, string[]> | null = new Map();
+        if (uxJson) {
+          try {
+            const uxData = JSON.parse(uxJson);
+            uxCommentsMap = extractCommentsFromUxData(uxData);
+            console.log('uxCommentsMap', uxCommentsMap);
+          } catch (error) {
+            console.error('解析UX数据失败:', error);
+            figma.notify('UX数据格式无效，仅导入UI部分', { error: true });
+          }
+        }
+        
+        // 如果uxCommentsMap有数据，则遍历uiData，将comments添加到node的comment属性中
+        if (uxCommentsMap.size) {
+          traverseTree(uiData[0], (node) => {
+            const comments = uxCommentsMap.get(node.id);
+            if (comments) {
+              console.log('comments', comments);
+              node.comment = comments;
+            }
+          });
+        }
+        // 创建一个变量来收集有comment的节点及其ID
+        const nodesWithComments = new Map<string, { node: SceneNode, comment: string[] }>();
+        
+        // 创建一个收集器函数，导入过程中将收集有comment的节点
+        const commentCollector = (nodeId: string, node: SceneNode, data: any) => {
+          if (data.comment) {
+            console.log('data.comment', data.comment);
+            nodesWithComments.set(node.id, { node, comment: data.comment });
+          }
+        };
+        
+        
+        // 导入UI JSON
+        importFigmaJSON(uiData, commentCollector).then(async (importedNodes) => {
+          // 如果有带comments的节点，则创建UX标注
+          if (nodesWithComments.size > 0) {
+            try {
+              // 准备UX信息数据
+              const uxInfoData: Record<string, string[]> = {};
+              console.log('nodesWithComments', nodesWithComments);
+              // 遍历带comments的节点
+              for (const [nodeId, { node, comment }] of nodesWithComments.entries()) {
+                // 直接将所有评论合并为一个字符串作为标注内容
+                uxInfoData[nodeId] = comment;
+              }
+              console.log('uxInfoData', uxInfoData);
+              // 创建并使用UX标注管理器
+              const textAnnotation = new TextAnnotation();
+              const uxManager = new UXInfoAnnotationManager(textAnnotation);
+              uxManager.processUXInfoV2(uxInfoData);
+            } catch (error: any) {
+              console.error('创建UX标注时出错:', error);
+              figma.notify(`创建UX标注失败: ${error.message}`, { error: true });
+            };
+          }
+
+          // 发送成功消息
+          figma.ui.postMessage({
+            type: "success",
+            data: `导入成功：UI组件 ${importedNodes.length} 个${nodesWithComments.size > 0 ? `，UI内置UX标注 ${nodesWithComments.size} 个` : ''}`,
+          });
+          
+          // 导入完成后重新生成代码
+          // if (isCodeGenerationEnabled) {
+          //   safeRun(userPluginSettings);
+          // }
+        }).catch((error) => {
+          console.error('导入UI+UX失败:', error);
+          figma.ui.postMessage({
+            type: "error",
+            data: `导入UI+UX失败: ${error.message}`,
+          });
+        });
+      } catch (error: any) {
+        console.error('解析UI+UX数据失败:', error);
+        figma.ui.postMessage({
+          type: "error",
+          data: `解析UI+UX数据失败: ${error.message}`,
+        });
+      }
     }
   });
 };
@@ -802,6 +915,8 @@ const sendResultMessage = (isSuccess: boolean, source: string, message: string) 
     data: message
   });
 };
+
+
 
 switch (figma.mode) {
   case "default":
