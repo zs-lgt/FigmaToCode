@@ -10,6 +10,7 @@ import {
   TextNodeCreator,
   VectorNodeCreator,
   BooleanOperationNodeCreator,
+  SVGNodeCreator,
 } from './nodeCreator';
 
 import type { NodeCreator } from './baseNodeCreator'
@@ -33,6 +34,7 @@ export class NodeFactory {
     this.creators.set('VECTOR', new VectorNodeCreator());
     this.creators.set('BOOLEAN_OPERATION', new BooleanOperationNodeCreator());
     this.creators.set('ELLIPSE', new EllipseNodeCreator());
+    this.creators.set('SVG', new SVGNodeCreator());
   }
 
   async createNode(type: string, data: any): Promise<SceneNode | null> {

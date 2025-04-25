@@ -413,3 +413,88 @@ export class EllipseNodeCreator extends BaseNodeCreator {
     return node;
   }
 }
+
+// SVG node creator
+export class SVGNodeCreator extends BaseNodeCreator {
+  async createNode(data: any): Promise<SceneNode | null> {
+    try {
+      if (!data.svg) {
+        console.warn('没有提供SVG内容');
+        return null;
+      }
+      
+      // 使用Figma的createNodeFromSvg API创建SVG节点
+      const svgNode = figma.createNodeFromSvg(data.svg);
+      
+      // 设置基本属性
+      this.setBaseProperties(svgNode, data);
+      
+      // 设置位置
+      if (data.x !== undefined) svgNode.x = data.x;
+      if (data.y !== undefined) svgNode.y = data.y;
+      
+      // 设置尺寸（如果有指定）
+      if (data.width && data.height) {
+        // 保持纵横比缩放
+        const currentRatio = svgNode.width / svgNode.height;
+        const targetRatio = data.width / data.height;
+        
+        if (Math.abs(currentRatio - targetRatio) < 0.1) {
+          // 如果纵横比相近，直接调整大小
+          svgNode.resize(data.width, data.height);
+        } else {
+          // 如果纵横比差异较大，保持纵横比缩放
+          if (currentRatio > targetRatio) {
+            // 宽度限制
+            const newWidth = data.width;
+            const newHeight = svgNode.height * (newWidth / svgNode.width);
+            svgNode.resize(newWidth, newHeight);
+          } else {
+            // 高度限制
+            const newHeight = data.height;
+            const newWidth = svgNode.width * (newHeight / svgNode.height);
+            svgNode.resize(newWidth, newHeight);
+          }
+        }
+      }
+      
+      // 为节点添加SVG元数据
+      svgNode.setPluginData('isSvgNode', 'true');
+      svgNode.setPluginData('originalSvgContent', data.svg);
+      
+      return svgNode;
+    } catch (error) {
+      console.error('创建SVG节点时出错:', error);
+      
+      // 出错时回退到创建占位Frame
+      try {
+        const placeholderNode = figma.createFrame();
+        placeholderNode.name = data.name || 'SVG占位符';
+        this.setBaseProperties(placeholderNode, data);
+        
+        // 设置尺寸和位置
+        if (data.width && data.height) {
+          placeholderNode.resize(data.width, data.height);
+        } else {
+          placeholderNode.resize(100, 100);
+        }
+        
+        if (data.x !== undefined) placeholderNode.x = data.x;
+        if (data.y !== undefined) placeholderNode.y = data.y;
+        
+        // 添加错误提示
+        const textNode = figma.createText();
+        textNode.characters = 'SVG加载失败';
+        textNode.fontSize = 12;
+        textNode.x = 5;
+        textNode.y = 5;
+        placeholderNode.appendChild(textNode);
+        
+        return placeholderNode;
+      } catch (fallbackError) {
+        console.error('创建SVG占位节点也失败了:', fallbackError);
+        return null;
+      }
+    }
+  }
+}
