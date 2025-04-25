@@ -536,10 +536,31 @@ export const PluginUI = (props: PluginUIProps) => {
         // 如果有UX文件，也读取
         if (uxJsonFile) {
           const uxReader = new FileReader();
-          uxReader.onload = (uxEvent) => {
+          uxReader.onload = async (uxEvent) => {
             try {
               const uxJsonContent = uxEvent.target?.result as string;
-              
+              // const uxJson = JSON.parse(uxJsonContent);
+              // const { description } = uxJson
+              // let commnetData = []
+              // if (description) {
+              //   commnetData = await Promise.all(description.map(async (item: any) => {
+              //     return new Promise(async (resolve, reject) => {
+              //       const comments = await Promise.all(item.comments.map(async (comment: any) => {
+              //         if (isSvgBase64(comment)) {
+              //           const pngBase64 = await svgBase64ToPngBase64(comment)
+              //           return pngBase64
+              //         }
+              //         return comment
+              //       }))
+              //       resolve({
+              //         ...item,
+              //         comments
+              //       })
+              //     })
+              //   }))
+              // }
+              // console.log(commnetData)
+
               // 发送两个文件内容到插件
               window.parent.postMessage(
                 { 
@@ -561,6 +582,7 @@ export const PluginUI = (props: PluginUIProps) => {
               
             } catch (error) {
               setIsLoading(false);
+              console.error(error)
               alert('UX JSON格式无效');
             }
           };

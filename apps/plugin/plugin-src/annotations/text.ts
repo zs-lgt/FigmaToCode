@@ -13,6 +13,7 @@ export class TextAnnotation extends BaseAnnotation {
     for(const item of content) {
       console.log('item', item);
       if (isBase64(item)) {
+        // 其他图片格式直接处理
         await this.createImageNode(frame, item);
       } else {
         await this.createTextNode(frame, item);
@@ -24,11 +25,13 @@ export class TextAnnotation extends BaseAnnotation {
     try {
       // Remove the data URL prefix to get the base64 string
       const base64String = base64Data.split(',')[1];
-      // 计算base64图片宽高
       // Convert base64 to array buffer
       const imageData = figma.base64Decode(base64String);
       // Create an image from the array buffer
       const image = await figma.createImage(imageData);
+      // 获取图片尺寸
+      const imageSize = await image.getSizeAsync();
+      console.log('imageSize', imageSize)
       
       // Create rectangle that uses the image as a fill
       const rect = figma.createRectangle();
@@ -39,9 +42,10 @@ export class TextAnnotation extends BaseAnnotation {
         imageHash: image.hash
       }];
       
-      // Set a reasonable size for the image rectangle
-      // rect.resize(400 - 32, 200);
-      
+      // 设置图片尺寸
+      if(imageSize.width > 0 && imageSize.height > 0) {
+        rect.resize(imageSize.width, imageSize.height);
+      }
       // Add the rectangle to the frame
       frame.appendChild(rect);
     } catch (error) {
@@ -93,7 +97,6 @@ export class TextAnnotation extends BaseAnnotation {
       // 使用缓存获取所有现有的标注
       const existingAnnotations = this.state.getCategoryNodeCache().textAnnotations
         .filter(node => node.id !== annotationContainer.id);
-      console.log('existingAnnotations', existingAnnotations);
       for (const existing of existingAnnotations) {
         const existingBounds = {
           x: existing.x,
