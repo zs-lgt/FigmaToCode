@@ -145,6 +145,16 @@ export const PluginUI = (props: PluginUIProps) => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const uiJsonFileRef = useRef<HTMLInputElement>(null);
   const uxJsonFileRef = useRef<HTMLInputElement>(null);
+  
+  // 添加进度状态
+  const [importProgress, setImportProgress] = useState<ProgressState>({
+    isActive: false,
+    current: 0,
+    total: 0,
+    success: 0,
+    failure: 0,
+    message: ''
+  });
 
   // 处理插件消息
   useEffect(() => {
@@ -166,16 +176,22 @@ export const PluginUI = (props: PluginUIProps) => {
           setShowImg2FigmaModal(false);
           setImagePreview(null);
         } else if (message.source === 'html2figma') {
-          setShowHtml2FigmaModal(false);
-          setHtml2figmaInput('');
+          // HTML2Figma成功后不立即关闭模态框，等用户查看进度信息后自己关闭
+          // 只更新进度条显示为完成状态
+          setImportProgress(prev => ({
+            ...prev,
+            message: '导入完成！',
+            isActive: true
+          }));
+          
         } else if (message.source === 'modify-component') {
           setShowModifyComponentModal(false);
           setModifyComponentInput('');
         }
         
-        // 使用Modal显示成功消息
+        // 使用Modal显示成功消息（除HTML2Figma外）
         if (message.source === 'nl2figma' || message.source === 'img2figma' || 
-            message.source === 'html2figma' || message.source === 'modify-component') {
+            message.source === 'modify-component') {
           setModalMessage(message.data);
           setIsModalOpen(true);
         }
@@ -187,7 +203,7 @@ export const PluginUI = (props: PluginUIProps) => {
         
         // 使用Modal显示错误消息
         if (message.source === 'nl2figma' || message.source === 'img2figma' || 
-            message.source === 'html2figma' || message.source === 'modify-component') {
+            message.source === 'modify-component') {
           setModalMessage(message.data);
           setIsModalOpen(true);
           
@@ -202,11 +218,15 @@ export const PluginUI = (props: PluginUIProps) => {
             } else if (message.source === 'img2figma') {
               setShowImg2FigmaModal(false);
               setImagePreview(null);
-            } else if (message.source === 'html2figma') {
-              setShowHtml2FigmaModal(false);
-              setHtml2figmaInput('');
             }
           }
+        } else if (message.source === 'html2figma') {
+          // HTML2Figma错误信息通过进度条显示
+          setImportProgress(prev => ({
+            ...prev,
+            message: `导入失败：${message.data}`,
+            isActive: true
+          }));
         } else {
           // 其他错误直接显示在控制台
           console.error(message.data);
@@ -214,6 +234,20 @@ export const PluginUI = (props: PluginUIProps) => {
       } else if (message && message.type === 'selected-node-info') {
         // 接收选中节点的信息
         setSelectedNodeName(message.name || '');
+      } else if (message.type === "code-gen-state") {
+        // 现有代码
+      } else if (message.type === "export-nodes-result") {
+        // 现有代码
+      } else if (message.type === "html2figma-progress") {
+        // 处理HTML2Figma进度信息
+        setImportProgress({
+          isActive: true,
+          current: message.data.current,
+          total: message.data.total,
+          success: message.data.success,
+          failure: message.data.failure,
+          message: message.data.message || ''
+        });
       }
     };
     window.addEventListener('message', handlePluginMessage);
@@ -472,9 +506,20 @@ export const PluginUI = (props: PluginUIProps) => {
     setShowHtml2FigmaModal(true);
   };
 
+  // 修改handleHtml2FigmaSubmit函数
   const handleHtml2FigmaSubmit = () => {
     try {
       setIsLoading(true);
+      // 重置并激活进度状态
+      setImportProgress({
+        isActive: true,
+        current: 0,
+        total: 0,
+        success: 0,
+        failure: 0,
+        message: '准备导入...'
+      });
+      
       // 发送消息到插件后端处理API调用
       window.parent.postMessage(
         { 
@@ -487,6 +532,14 @@ export const PluginUI = (props: PluginUIProps) => {
       );
     } catch (error: any) {
       setIsLoading(false);
+      setImportProgress({
+        isActive: false,
+        current: 0,
+        total: 0,
+        success: 0,
+        failure: 0,
+        message: ''
+      });
       console.error('发送请求失败:', error);
       alert(`发送请求失败: ${error.message}`);
     }
@@ -1133,14 +1186,26 @@ export const PluginUI = (props: PluginUIProps) => {
               value={html2figmaInput}
               onChange={(e) => setHtml2figmaInput(e.target.value)}
               className="w-full h-32 p-2 border rounded-md mb-4 dark:bg-gray-700 dark:text-white"
-              placeholder="请输入HTML URL"
+              placeholder="请输入HTML URL，多个URL请用换行符分隔"
               disabled={isLoading}
             />
+            
+            {/* 添加进度条组件 */}
+            <ImportProgress progress={importProgress} />
+            
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => {
                   setShowHtml2FigmaModal(false);
                   setHtml2figmaInput('');
+                  setImportProgress({
+                    isActive: false,
+                    current: 0,
+                    total: 0,
+                    success: 0,
+                    failure: 0,
+                    message: ''
+                  });
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                 disabled={isLoading}
@@ -1853,4 +1918,51 @@ const initResize = (e: React.MouseEvent) => {
 
   document.addEventListener('mousemove', resize);
   document.addEventListener('mouseup', stopResize);
+};
+
+// 在顶部导入区域下方添加进度条组件
+export type ProgressState = {
+  isActive: boolean;
+  current: number;
+  total: number;
+  success: number;
+  failure: number;
+  message: string;
+};
+
+// 添加进度条组件
+const ImportProgress: React.FC<{
+  progress: ProgressState;
+}> = ({ progress }) => {
+  if (!progress.isActive) return null;
+  
+  // 计算进度百分比
+  const percent = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
+  
+  return (
+    <div className="mt-2 mb-4">
+      <div className="flex justify-between mb-1">
+        <span className="text-sm text-gray-700 dark:text-gray-300">
+          {progress.message || `处理中 (${progress.current}/${progress.total})`}
+        </span>
+        <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{percent}%</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 overflow-hidden">
+        <div 
+          className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
+          style={{ width: `${percent}%` }}
+        ></div>
+      </div>
+      {progress.success > 0 || progress.failure > 0 ? (
+        <div className="flex justify-between mt-1 text-xs">
+          <span className="text-green-600 dark:text-green-400">
+            成功: {progress.success}
+          </span>
+          <span className="text-red-600 dark:text-red-400">
+            失败: {progress.failure}
+          </span>
+        </div>
+      ) : null}
+    </div>
+  );
 };

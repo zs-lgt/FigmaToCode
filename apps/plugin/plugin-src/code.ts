@@ -535,15 +535,20 @@ const standardMode = async () => {
               throw new Error('没有检测到有效的URL');
             }
             
-            figma.notify(`检测到${urls.length}个URL，将依次处理`, { timeout: 3000 });
-            
             // 记录总共导入的节点
             let allImportedNodes: SceneNode[] = [];
+            let successCount = 0;
+            let failureCount = 0;
+            
+            // 发送初始进度信息
+            sendProgressInfo(0, urls.length, successCount, failureCount, '准备处理URL...');
             
             // 依次处理每个URL
             for (let i = 0; i < urls.length; i++) {
               const url = urls[i];
-              figma.notify(`正在处理第${i+1}/${urls.length}个URL: ${url.substring(0, 30)}...`, { timeout: 2000 });
+              
+              // 发送当前进度信息
+              sendProgressInfo(i, urls.length, successCount, failureCount, `处理第${i+1}/${urls.length}个URL`);
               
               try {
                 // 调用API处理单个URL
@@ -577,38 +582,45 @@ const standardMode = async () => {
                     storeHistoryData(topLevelNode, `HTML转换：${url}`, data.llmout);
                   }
                   
-                  figma.notify(`成功导入URL (${i+1}/${urls.length})`, { timeout: 1000 });
+                  successCount++;
                 } else {
-                  figma.notify(`URL (${i+1}/${urls.length}) 导入失败: ${data.status || '未知错误'}`, { error: true, timeout: 2000 });
+                  failureCount++;
+                  console.error(`URL导入失败: ${url}, 状态: ${data.status || '未知错误'}`);
                 }
               } catch (urlError) {
                 console.error(`处理URL失败: ${url}`, urlError);
-                figma.notify(`URL (${i+1}/${urls.length}) 处理失败`, { error: true, timeout: 2000 });
+                failureCount++;
                 // 继续处理下一个URL
               }
+              
+              // 更新进度信息
+              sendProgressInfo(i+1, urls.length, successCount, failureCount, `已完成${i+1}/${urls.length}个URL`);
             }
             
             // 所有URL处理完毕
             if (allImportedNodes.length > 0) {
-              figma.notify(`成功导入${allImportedNodes.length}个组件，共处理了${urls.length}个URL`, { timeout: 3000 });
+              sendProgressInfo(urls.length, urls.length, successCount, failureCount, '导入完成!');
               sendResultMessage(true, "html2figma", `成功导入${allImportedNodes.length}个组件，共处理了${urls.length}个URL`);
             } else {
-              throw new Error('所有URL处理完毕，但没有成功导入任何组件');
+              sendResultMessage(false, "html2figma", `已处理${urls.length}个URL，但未能成功导入任何组件`);
             }
           } 
           // 处理单URL情况
           else {
             // 保持原有的单URL处理逻辑
             const url = inputText;
-            figma.notify('开始处理单个URL...');
+            
+            // 发送进度信息
+            sendProgressInfo(0, 1, 0, 0, '准备处理URL...');
             
             // 调用API
             const data = await callHtml2FigmaAPI(url);
             
+            // 更新进度信息
+            sendProgressInfo(0, 1, 0, 0, '正在导入组件...');
+            
             if (data.status === 'success' && data.figma_json) {
               try {
-                figma.notify('开始导入JSON数据...');
-                
                 // 判断figma_json的类型
                 let importedNodes: SceneNode[] = [];
                 
@@ -616,12 +628,13 @@ const standardMode = async () => {
                   // 如果是字符串，解析后直接导入
                   const parsedJson = JSON.parse(data.figma_json);
                   importedNodes = await importFigmaJSON(parsedJson);
-                  figma.notify(`成功导入单个JSON组件`, { timeout: 2000 });
                 } else {
                   // 非字符串也非数组，尝试直接导入
-                  figma.notify('未知JSON格式，尝试直接导入...', { timeout: 1000 });
                   importedNodes = await importFigmaJSON(data.figma_json);
                 }
+                
+                // 完成进度信息
+                sendProgressInfo(1, 1, 1, 0, '导入完成!');
                 
                 // 将url和llmout作为一对数据存储到节点信息中
                 if (importedNodes && importedNodes.length > 0 && data.llmout) {
@@ -634,9 +647,13 @@ const standardMode = async () => {
                 sendResultMessage(true, "html2figma", data.llmout || '组件生成成功');
               } catch (parseError) {
                 console.error('JSON解析或导入错误:', parseError);
+                // 完成进度信息（失败）
+                sendProgressInfo(1, 1, 0, 1, 'JSON解析错误');
                 throw new Error('JSON解析或导入错误: ' + (parseError instanceof Error ? parseError.message : String(parseError)));
               }
             } else {
+              // 完成进度信息（失败）
+              sendProgressInfo(1, 1, 0, 1, 'API返回错误');
               throw new Error(`API返回状态错误: ${data.status}`);
             }
           }
@@ -1011,7 +1028,19 @@ const sendResultMessage = (isSuccess: boolean, source: string, message: string) 
   });
 };
 
-
+// 在文件底部添加发送进度信息的函数
+const sendProgressInfo = (current: number, total: number, success: number, failure: number, message: string = '') => {
+  figma.ui.postMessage({
+    type: "html2figma-progress",
+    data: {
+      current,
+      total,
+      success,
+      failure,
+      message
+    }
+  });
+};
 
 switch (figma.mode) {
   case "default":
