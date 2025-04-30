@@ -521,64 +521,124 @@ const standardMode = async () => {
             throw new Error('没有提供HTML URL');
           }
           
-          // 调用API
-          const data = await callHtml2FigmaAPI(msg.url);
+          // 检查输入内容是否包含多个URL
+          const inputText = msg.url.trim();
           
-          if (data.status === 'success' && data.figma_json) {
-            try {
-              figma.notify('开始导入JSON数据...');
+          // 处理多URL情况：输入以http开头且包含换行符
+          if (inputText.startsWith('http') && inputText.includes('\n')) {
+            // 提取所有URL
+            const urls: string[] = inputText.split('\n')
+              .map((url: string) => url.trim())
+              .filter((url: string) => url.startsWith('http'));
+            
+            if (urls.length === 0) {
+              throw new Error('没有检测到有效的URL');
+            }
+            
+            figma.notify(`检测到${urls.length}个URL，将依次处理`, { timeout: 3000 });
+            
+            // 记录总共导入的节点
+            let allImportedNodes: SceneNode[] = [];
+            
+            // 依次处理每个URL
+            for (let i = 0; i < urls.length; i++) {
+              const url = urls[i];
+              figma.notify(`正在处理第${i+1}/${urls.length}个URL: ${url.substring(0, 30)}...`, { timeout: 2000 });
               
-              // 判断figma_json的类型
-              let importedNodes: SceneNode[] = [];
-              
-              if (typeof data.figma_json === 'string') {
-                // 如果是字符串，解析后直接导入
-                const parsedJson = JSON.parse(data.figma_json);
-                importedNodes = await importFigmaJSON(parsedJson);
-                figma.notify(`成功导入单个JSON组件`, { timeout: 2000 });
-              } else if (Array.isArray(data.figma_json)) {
-                // 如果是数组，依次导入每个JSON对象
-                figma.notify(`检测到${data.figma_json.length}个组件数据，开始依次导入...`, { timeout: 2000 });
+              try {
+                // 调用API处理单个URL
+                const data = await callHtml2FigmaAPI(url);
                 
-                // 依次导入每个JSON
-                for (let i = 0; i < data.figma_json.length; i++) {
-                  const jsonItem = data.figma_json[i];
-                  figma.notify(`正在导入第${i+1}/${data.figma_json.length}个组件...`, { timeout: 1000 });
+                if (data.status === 'success' && data.figma_json) {
+                  // 解析JSON
+                  let importedNodes: SceneNode[] = [];
                   
-                  try {
-                    // 解析当前JSON项
-                    const parsedJson = typeof jsonItem === 'string' ? JSON.parse(jsonItem) : jsonItem;
-                    // 导入并合并结果
-                    const nodes = await importFigmaJSON(parsedJson);
-                    importedNodes = [...importedNodes, ...nodes];
-                  } catch (itemError) {
-                    console.error(`导入第${i+1}个组件失败:`, itemError);
-                    figma.notify(`导入第${i+1}个组件失败`, { error: true, timeout: 2000 });
+                  if (typeof data.figma_json === 'string') {
+                    const parsedJson = JSON.parse(data.figma_json);
+                    importedNodes = await importFigmaJSON(parsedJson);
+                  } else if (Array.isArray(data.figma_json)) {
+                    // 即使API返回数组，也依次导入每个元素
+                    for (const jsonItem of data.figma_json) {
+                      const parsedJson = typeof jsonItem === 'string' ? JSON.parse(jsonItem) : jsonItem;
+                      const nodes = await importFigmaJSON(parsedJson);
+                      importedNodes = [...importedNodes, ...nodes];
+                    }
+                  } else {
+                    // 直接导入
+                    importedNodes = await importFigmaJSON(data.figma_json);
                   }
+                  
+                  // 记录导入的节点
+                  allImportedNodes = [...allImportedNodes, ...importedNodes];
+                  
+                  // 存储历史记录
+                  if (importedNodes.length > 0 && data.llmout) {
+                    const topLevelNode = importedNodes[0];
+                    storeHistoryData(topLevelNode, `HTML转换：${url}`, data.llmout);
+                  }
+                  
+                  figma.notify(`成功导入URL (${i+1}/${urls.length})`, { timeout: 1000 });
+                } else {
+                  figma.notify(`URL (${i+1}/${urls.length}) 导入失败: ${data.status || '未知错误'}`, { error: true, timeout: 2000 });
+                }
+              } catch (urlError) {
+                console.error(`处理URL失败: ${url}`, urlError);
+                figma.notify(`URL (${i+1}/${urls.length}) 处理失败`, { error: true, timeout: 2000 });
+                // 继续处理下一个URL
+              }
+            }
+            
+            // 所有URL处理完毕
+            if (allImportedNodes.length > 0) {
+              figma.notify(`成功导入${allImportedNodes.length}个组件，共处理了${urls.length}个URL`, { timeout: 3000 });
+              sendResultMessage(true, "html2figma", `成功导入${allImportedNodes.length}个组件，共处理了${urls.length}个URL`);
+            } else {
+              throw new Error('所有URL处理完毕，但没有成功导入任何组件');
+            }
+          } 
+          // 处理单URL情况
+          else {
+            // 保持原有的单URL处理逻辑
+            const url = inputText;
+            figma.notify('开始处理单个URL...');
+            
+            // 调用API
+            const data = await callHtml2FigmaAPI(url);
+            
+            if (data.status === 'success' && data.figma_json) {
+              try {
+                figma.notify('开始导入JSON数据...');
+                
+                // 判断figma_json的类型
+                let importedNodes: SceneNode[] = [];
+                
+                if (typeof data.figma_json === 'string') {
+                  // 如果是字符串，解析后直接导入
+                  const parsedJson = JSON.parse(data.figma_json);
+                  importedNodes = await importFigmaJSON(parsedJson);
+                  figma.notify(`成功导入单个JSON组件`, { timeout: 2000 });
+                } else {
+                  // 非字符串也非数组，尝试直接导入
+                  figma.notify('未知JSON格式，尝试直接导入...', { timeout: 1000 });
+                  importedNodes = await importFigmaJSON(data.figma_json);
                 }
                 
-                figma.notify(`成功导入${importedNodes.length}个组件`, { timeout: 3000 });
-              } else {
-                // 非字符串也非数组，尝试直接导入
-                figma.notify('未知JSON格式，尝试直接导入...', { timeout: 1000 });
-                importedNodes = await importFigmaJSON(data.figma_json);
+                // 将url和llmout作为一对数据存储到节点信息中
+                if (importedNodes && importedNodes.length > 0 && data.llmout) {
+                  // 只在最外层节点上存储历史记录
+                  const topLevelNode = importedNodes[0];
+                  storeHistoryData(topLevelNode, `HTML转换：${url}`, data.llmout);
+                }
+                
+                // 发送成功消息
+                sendResultMessage(true, "html2figma", data.llmout || '组件生成成功');
+              } catch (parseError) {
+                console.error('JSON解析或导入错误:', parseError);
+                throw new Error('JSON解析或导入错误: ' + (parseError instanceof Error ? parseError.message : String(parseError)));
               }
-              
-              // 将url和llmout作为一对数据存储到节点信息中
-              if (importedNodes && importedNodes.length > 0 && data.llmout) {
-                // 只在最外层节点上存储历史记录
-                const topLevelNode = importedNodes[0];
-                storeHistoryData(topLevelNode, `HTML转换：${msg.url}`, data.llmout);
-              }
-              
-              // 发送成功消息
-              sendResultMessage(true, "html2figma", data.llmout || '组件生成成功');
-            } catch (parseError) {
-              console.error('JSON解析或导入错误:', parseError);
-              throw new Error('JSON解析或导入错误: ' + (parseError instanceof Error ? parseError.message : String(parseError)));
+            } else {
+              throw new Error(`API返回状态错误: ${data.status}`);
             }
-          } else {
-            throw new Error(`API返回状态错误: ${data.status}`);
           }
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : '未知错误';
