@@ -462,7 +462,7 @@ const standardMode = async () => {
     } else if (msg.type === 'export-nodes') {
       const nodes = figma.currentPage.children;
       
-      exportNodes(nodes, msg.optimize, false).then(async nodesData => {
+      exportNodes(nodes, msg.optimize, false, msg.keepOriginal).then(async nodesData => {
         const { nodesInfo, description, images, optimize } = nodesData;
         const imagesData = [];
         for (const imageId of images) {

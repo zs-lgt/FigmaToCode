@@ -10,7 +10,19 @@ import {
 export { getNodeExportImage };
 
 // 递归处理节点及其子节点
-const processNode = async (node: SceneNode, imageDataMap: Map<string, string> = new Map()) => {
+const processNode = async (node: SceneNode, imageDataMap: Map<string, string> = new Map(), keepOriginal: boolean = false) => {
+  // 如果是完整版导出，直接返回完整节点信息
+  if (keepOriginal) {
+    const processedNode = getNodeInfo(node);
+    // 处理子节点
+    if ('children' in node && node.children) {
+      processedNode.children = await Promise.all(
+        node.children.map(child => processNode(child, imageDataMap, keepOriginal))
+      );
+    }
+    return processedNode;
+  }
+
   // 如果是COMPONENT_SET节点，返回包含key和属性定义的信息
   if (node.type === 'COMPONENT_SET') {
     const processedNode = getNodeInfo(node);
@@ -108,7 +120,7 @@ const processNode = async (node: SceneNode, imageDataMap: Map<string, string> = 
   return processedNode;
 };
 
-export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean, filterSymbols: boolean = true) => {
+export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean, filterSymbols: boolean = true, keepOriginal: boolean = false) => {
   let description = '';
   const exportedNodes = [];
   const exportedImages = [];
@@ -140,7 +152,7 @@ export const exportNodes = async (nodes: readonly SceneNode[], optimize: boolean
       }
       
       // 处理节点及其子节点，同时传入图片数据映射
-      const processedNode = await processNode(node, imageDataMap);
+      const processedNode = await processNode(node, imageDataMap, keepOriginal);
       if (processedNode) {
         exportedNodes.push(optimize ? cleanExportData(processedNode) : processedNode);
         exportedImages.push({

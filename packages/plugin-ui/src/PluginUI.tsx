@@ -360,6 +360,16 @@ export const PluginUI = (props: PluginUIProps) => {
     }, '*');
   };
 
+  const handleExportFullNodesClick = () => {
+    parent.postMessage({ 
+      pluginMessage: { 
+        type: 'export-nodes',
+        optimize: false,
+        keepOriginal: true
+      }
+    }, '*');
+  };
+
   const handleExportSelectedNodesClick = () => {
     parent.postMessage({ 
       pluginMessage: { 
@@ -723,6 +733,12 @@ export const PluginUI = (props: PluginUIProps) => {
             </button>
             <button
               onClick={handleExportCompleteNodesClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              导出设计信息（组件版）
+            </button>
+            <button
+              onClick={handleExportFullNodesClick}
               className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
             >
               导出设计信息（完整版）
