@@ -82,8 +82,13 @@ export class TextAnnotation extends BaseAnnotation {
     return current;
   }
 
-  // 调整标注位置以避免重叠
-  private adjustAnnotationPosition(annotationContainer: FrameNode): void {
+  /**
+   * 调整标注位置以避免重叠
+   * @param annotationContainer 标注容器节点
+   * @param direction 防重叠方向，'vertical'表示纵向调整，'horizontal'表示横向调整
+   * @param step 每次移动的步长（像素）
+   */
+  private adjustAnnotationPosition(annotationContainer: FrameNode, direction: 'vertical' | 'horizontal' = 'vertical', step: number = 20): void {
     const currentBounds = {
       x: annotationContainer.x,
       y: annotationContainer.y,
@@ -107,9 +112,15 @@ export class TextAnnotation extends BaseAnnotation {
         
         // 检查是否有重叠
         if (this.checkOverlap(currentBounds, existingBounds)) {
-          // 如果有重叠，向下移动20px
-          annotationContainer.y += 20;
-          currentBounds.y += 20;
+          if (direction === 'vertical') {
+            // 纵向调整：向下移动
+            annotationContainer.y += step;
+            currentBounds.y += step;
+          } else {
+            // 横向调整：向右移动
+            annotationContainer.x += step;
+            currentBounds.x += step;
+          }
           hasOverlap = true;
           break;
         }
@@ -265,7 +276,7 @@ export class TextAnnotation extends BaseAnnotation {
       const rootNode = this.findRootParent(node);
       const rootBounds = {
         x: rootNode.x,
-        y: rootNode.y,
+        y: bounds.y,
         width: rootNode.width,
         height: rootNode.height
       };
@@ -273,7 +284,7 @@ export class TextAnnotation extends BaseAnnotation {
       annotationContainer.x = rootBounds.x + rootBounds.width + 20;
       annotationContainer.y = rootBounds.y;
       // 检查并避免与现有标注的重叠
-      this.adjustAnnotationPosition(annotationContainer);
+      this.adjustAnnotationPosition(annotationContainer, 'horizontal');
 
       // 创建一个组来包含源标注
       const sourceGroup = figma.group([sourceNumber], figma.currentPage);
@@ -341,7 +352,7 @@ export class TextAnnotation extends BaseAnnotation {
 
       // // 保存计数器状态
       figma.clientStorage.setAsync("annotationCounter", this.state.annotationCounter);
-      figma.notify("标注创建成功");
+      // figma.notify("标注创建成功");
     } catch (error) {
       console.error("创建文本标注时出错:", error);
     }
