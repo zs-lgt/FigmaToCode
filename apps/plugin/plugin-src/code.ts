@@ -14,8 +14,10 @@ import { htmlCodeGenTextStyles } from "backend/src/html/htmlMain";
 import { swiftUICodeGenTextStyles } from "backend/src/swiftui/swiftuiMain";
 import { exportNodes, getNodeExportImage } from 'backend/src/export';
 import { importFigmaJSON } from 'backend/src/importFigma';
-import { TextAnnotation } from './annotations/text';
-import { UXInfoAnnotationManager } from './annotations/uxInfoAnnotation';
+import { TextAnnotation } from './ux/annotations/text';
+import { Connection } from './ux/connections/connection'
+import { TextAnnotationFactory } from './ux/textAnnotationFactory';
+import { Edge, ConnectionFactory } from './ux/connectionFactory'
 
 let userPluginSettings: PluginSettings;
 let isCodeGenerationEnabled = true;  // 添加代码生成状态控制
@@ -33,6 +35,11 @@ const defaultPluginSettings: PluginSettings = {
   roundTailwindColors: false,
   customTailwindColors: false,
 };
+
+interface Ux {
+  description: any
+  edges: Edge[]
+}
 
 // A helper type guard to ensure the key belongs to the PluginSettings type
 function isKeyOfPluginSettings(key: string): key is keyof PluginSettings {
@@ -85,18 +92,20 @@ const safeRun = (settings: PluginSettings) => {
 };
 
 // 从UX数据中提取评论信息，映射到节点ID
-function extractCommentsFromUxData(uxData: any): Map<string, string[]> {
+function extractMapsFromUxData(uxData: Ux) {
   const commentsMap = new Map<string, string[]>();
   const { description = [] } = uxData
   console.log('uxData', description);
-  // 处理UX数据格式1：{ nodeId: { comments: string[] } }
+  // 处理UX数据格式：{ nodeId: { comments: string[] } }
   if (description.length) {
     for (const item of description) {
       const { id, comments } = item;
       commentsMap.set(id, comments);
     };
   }
-  return commentsMap;
+  return {
+    commentsMap,
+  };
 }
 
 // 修改traverseTree函数
@@ -230,8 +239,8 @@ const standardMode = async () => {
     } else if (msg.type === "import-ux-info") {
       try {
         const textAnnotation = new TextAnnotation();
-        const uxManager = new UXInfoAnnotationManager(textAnnotation);
-        await uxManager.processUXInfo(msg.data);
+        const textAnnotationFactory = new TextAnnotationFactory(textAnnotation);
+        await textAnnotationFactory.createAnnotation(msg.data);
         sendResultMessage(true, 'ux-import', '导入UX交互信息成功');
       } catch (error: any) {
         sendResultMessage(false, 'ux-import', `导入失败: ${error.message}`);
@@ -322,8 +331,8 @@ const standardMode = async () => {
               }
               // 创建并使用UX标注管理器
               const textAnnotation = new TextAnnotation();
-              const uxManager = new UXInfoAnnotationManager(textAnnotation);
-              await uxManager.processUXInfo(uxInfoData);
+              const uxManager = new TextAnnotationFactory(textAnnotation);
+              await uxManager.createAnnotation(uxInfoData);
               figma.notify(`已为 ${nodesWithComments.size} 个节点创建UX标注`);
             } catch (error: any) {
               console.error('创建UX标注时出错:', error);
@@ -721,13 +730,13 @@ const standardMode = async () => {
           throw new Error('UI JSON数据不能为空');
         }
         const uiData = JSON.parse(uiJson);
+        const uxData = JSON.parse(uxJson) as Ux;
 
         // 解析UX数据
         let uxCommentsMap: Map<string, string[]> | null = new Map();
         if (uxJson) {
           try {
-            const uxData = JSON.parse(uxJson);
-            uxCommentsMap = extractCommentsFromUxData(uxData);
+            const { commentsMap: uxCommentsMap } = extractMapsFromUxData(uxData);
             console.log('uxCommentsMap', uxCommentsMap);
           } catch (error) {
             console.error('解析UX数据失败:', error);
@@ -749,8 +758,15 @@ const standardMode = async () => {
         const nodesWithComments = new Map<string, { node: SceneNode, comment: string[] }>();
         
         // 使用闭包创建一个收集器函数
-        const collector = (nodeId: string, node: SceneNode, data: any) => {
-          commentCollector(nodeId, node, data, nodesWithComments);
+        const collector = (originalNodeId: string, node: SceneNode, data: any) => {
+          // 建立一个json id到figma id的映射map
+          const nodeIdMap = new Map<string, string>()
+          
+          if (data.comment) {
+            console.log('data.comment', data.comment);
+            nodesWithComments.set(node.id, { node, comment: data.comment });
+          }
+          nodeIdMap.set(originalNodeId, node.id)
         };
         
         
@@ -768,14 +784,30 @@ const standardMode = async () => {
                 uxInfoData[nodeId] = comment;
               }
               console.log('uxInfoData', uxInfoData);
-              // 创建并使用UX标注管理器
+              // 批量创建文字标注节点
               const textAnnotation = new TextAnnotation();
-              const uxManager = new UXInfoAnnotationManager(textAnnotation);
-              uxManager.processUXInfoV2(uxInfoData);
+              const textFactory = new TextAnnotationFactory(textAnnotation);
+              textFactory.createAnnotationV2(uxInfoData);
+
             } catch (error: any) {
               console.error('创建UX标注时出错:', error);
               figma.notify(`创建UX标注失败: ${error.message}`, { error: true });
             };
+          }
+
+          // 批量创建连线
+          const { edges = [] } = uxData
+          if (edges.length > 0) {
+            const connection = new Connection();
+            const connectionFactory = new ConnectionFactory(connection);
+            // 映射到真实创建的figma节点上
+            const realEdges = edges.map(edge => ({
+              ...edge,
+              start: nodeIdMap.get(edge.start),
+              end: nodeIdMap.get(edge.end)
+            })) as Edge[]
+            console.log('real', realEdges, edges)
+            connectionFactory.createConnections(realEdges)
           }
 
           // 发送成功消息

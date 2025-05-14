@@ -12,12 +12,14 @@
     "pack-plugin": "node scripts/pack-plugin.js"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.16",
     "eslint": "^9.7.0",
     "eslint-config-custom": "workspace:*",
     "prettier": "^3.3.3",
     "turbo": "^2.0.9"
   },
   "dependencies": {
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "lodash": "^4.17.21"
   }
 }

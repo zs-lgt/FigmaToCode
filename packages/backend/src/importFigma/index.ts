@@ -206,7 +206,6 @@ export async function importNode(
       let node: SceneNode | null = null;
       // 特殊处理INSTANCE节点
       if (nodeData.type === 'INSTANCE') {
-        console.log(1, nodeData);
         
         if (nodeData.componentKey) {
           try {
