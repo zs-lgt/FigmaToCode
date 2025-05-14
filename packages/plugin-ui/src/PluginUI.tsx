@@ -192,9 +192,12 @@ export const PluginUI = (props: PluginUIProps) => {
         } else if (message.source === 'property-stat') {
           setShowPropertyStatModal(false);
           setPropertyStatInput('');
+        } else if (message.source === 'detach-component') {
+          // 解绑组件成功后的处理，只打印日志，不显示消息框
+          console.log('解绑组件成功');
         }
         
-        // 使用Modal显示成功消息（除HTML2Figma外）
+        // 使用Modal显示成功消息（除HTML2Figma和detach-component外）
         if (message.source === 'nl2figma' || message.source === 'img2figma' || 
             message.source === 'modify-component' || message.source === 'property-stat') {
           setModalMessage(message.data);
@@ -206,7 +209,7 @@ export const PluginUI = (props: PluginUIProps) => {
         // 关闭加载状态
         setIsLoading(false);
         
-        // 使用Modal显示错误消息
+        // 使用Modal显示错误消息（除detach-component外）
         if (message.source === 'nl2figma' || message.source === 'img2figma' || 
             message.source === 'modify-component' || message.source === 'property-stat') {
           setModalMessage(message.data);
@@ -232,6 +235,9 @@ export const PluginUI = (props: PluginUIProps) => {
             message: `导入失败：${message.data}`,
             isActive: true
           }));
+        } else if (message.source === 'detach-component') {
+          // 解绑组件失败只打印日志，不显示消息框
+          console.error('解绑组件失败:', message.data);
         } else {
           // 其他错误直接显示在控制台
           console.error(message.data);
@@ -757,6 +763,14 @@ export const PluginUI = (props: PluginUIProps) => {
     }
   };
 
+  // 在PluginUI组件内部，添加handleDetachComponent函数
+  const handleDetachComponent = () => {
+    window.parent.postMessage(
+      { pluginMessage: { type: "detach-component" } },
+      "*"
+    );
+  };
+
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
@@ -841,6 +855,12 @@ export const PluginUI = (props: PluginUIProps) => {
               className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
             >
               修改组件
+            </button>
+            <button
+              onClick={handleDetachComponent}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-purple-600 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            >
+              解绑组件
             </button>
             <button
               onClick={handlePropertyStatClick}

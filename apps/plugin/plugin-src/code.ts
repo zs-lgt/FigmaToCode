@@ -191,6 +191,42 @@ const standardMode = async () => {
         // 重新生成代码
         safeRun(userPluginSettings);
       }
+    } else if (msg.type === "detach-component") {
+      // 处理解绑组件的请求
+      (async () => {
+        try {
+          // 检查是否有选中的节点
+          const selection = figma.currentPage.selection;
+          if (selection.length === 0) {
+            throw new Error('请先选择要解绑的节点');
+          }
+          
+          // 处理选中的所有节点
+          let totalDetached = 0;
+          
+          for (const selectedNode of selection) {
+            // 递归解绑选中节点及其所有子节点中的组件实例
+            const detached = await detachComponentInstances(selectedNode);
+            totalDetached += detached;
+          }
+          
+          // 发送成功消息
+          if (totalDetached > 0) {
+            sendResultMessage(true, "detach-component", `成功解绑了 ${totalDetached} 个组件实例`);
+          } else {
+            sendResultMessage(true, "detach-component", "未找到需要解绑的组件实例");
+          }
+          
+          // 如果代码生成已启用，重新生成代码
+          if (isCodeGenerationEnabled) {
+            safeRun(userPluginSettings);
+          }
+        } catch (error: any) {
+          const errorMessage = error instanceof Error ? error.message : '未知错误';
+          console.error('解绑组件失败:', error);
+          sendResultMessage(false, "detach-component", `解绑组件失败: ${errorMessage}`);
+        }
+      })();
     } else if (msg.type === "import-ux-info") {
       try {
         const textAnnotation = new TextAnnotation();
@@ -1637,6 +1673,42 @@ const callPropertyStatAPI = async (figma_json: any, query: string, traceId: stri
   const result: any = await response.json();
   console.log('API响应成功');
   return result;
+};
+
+// 递归解绑组件实例的函数
+const detachComponentInstances = async (node: SceneNode): Promise<number> => {
+  let detachedCount = 0;
+  
+  // 如果节点是组件实例，解绑它
+  if (node.type === "INSTANCE") {
+    try {
+      // 创建通知
+      figma.notify(`正在解绑组件: ${node.name}`, { timeout: 1000 });
+      
+      // 解绑实例，将其转换为普通Frame/Group
+      const detachedNode = node.detachInstance();
+      console.log(`成功解绑组件实例: ${node.name}`);
+      
+      // 递归处理解绑后的子节点
+      if ('children' in detachedNode && detachedNode.children) {
+        for (const child of detachedNode.children) {
+          detachedCount += await detachComponentInstances(child);
+        }
+      }
+      
+      detachedCount++;
+    } catch (error) {
+      console.error(`解绑组件实例失败: ${node.name}`, error);
+    }
+  }
+  // 如果节点有子节点，递归处理
+  else if ('children' in node && node.children) {
+    for (const child of node.children) {
+      detachedCount += await detachComponentInstances(child);
+    }
+  }
+  
+  return detachedCount;
 };
 
 switch (figma.mode) {
