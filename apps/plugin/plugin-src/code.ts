@@ -210,13 +210,29 @@ const standardMode = async () => {
             throw new Error('请先选择要解绑的节点');
           }
           
+          // 记录原始选中的节点
+          const originalSelection = [...selection];
+          
           // 处理选中的所有节点
           let totalDetached = 0;
           
+          // 第一次解绑
           for (const selectedNode of selection) {
             // 递归解绑选中节点及其所有子节点中的组件实例
             const detached = await detachComponentInstances(selectedNode);
             totalDetached += detached;
+          }
+          
+          // 保持相同的选择状态（因为原始节点可能已变化，所以选择现在的节点）
+          // 这里不需要做任何操作，因为解绑后节点应该仍然保持选中状态
+          
+          // 第二次解绑：对同样的节点再执行一次解绑操作，确保完全解绑
+          // 注意：此时选择的节点已经是解绑后的节点，可能结构已改变
+          if (figma.currentPage.selection.length > 0) {
+            for (const selectedNode of figma.currentPage.selection) {
+              const detachedAgain = await detachComponentInstances(selectedNode);
+              totalDetached += detachedAgain;
+            }
           }
           
           // 发送成功消息
@@ -1712,36 +1728,64 @@ const callPropertyStatAPI = async (figma_json: any, query: string, traceId: stri
 const detachComponentInstances = async (node: SceneNode): Promise<number> => {
   let detachedCount = 0;
   
-  // 如果节点是组件实例，解绑它
-  if (node.type === "INSTANCE") {
-    try {
-      // 创建通知
-      figma.notify(`正在解绑组件: ${node.name}`, { timeout: 1000 });
+  // 使用广度优先搜索收集所有实例节点及其层级
+  const collectInstances = (rootNode: SceneNode): { id: string, depth: number }[] => {
+    const instances: { id: string, depth: number }[] = [];
+    const queue: { node: SceneNode, depth: number }[] = [{ node: rootNode, depth: 0 }];
+    
+    while (queue.length > 0) {
+      const { node: currentNode, depth } = queue.shift()!;
       
-      // 解绑实例，将其转换为普通Frame/Group
-      const detachedNode = node.detachInstance();
-      console.log(`成功解绑组件实例: ${node.name}`);
-      
-      // 递归处理解绑后的子节点
-      if ('children' in detachedNode && detachedNode.children) {
-        for (const child of detachedNode.children) {
-          detachedCount += await detachComponentInstances(child);
-        }
+      // 如果当前节点是实例，添加到结果数组
+      if (currentNode.type === 'INSTANCE') {
+        instances.push({ id: currentNode.id, depth });
       }
       
-      detachedCount++;
-    } catch (error) {
-      console.error(`解绑组件实例失败: ${node.name}`, error);
+      // 添加子节点到队列
+      if ('children' in currentNode && currentNode.children) {
+        for (const child of currentNode.children) {
+          queue.push({ node: child, depth: depth + 1 });
+        }
+      }
     }
-  }
-  // 如果节点有子节点，递归处理
-  else if ('children' in node && node.children) {
-    for (const child of node.children) {
-      detachedCount += await detachComponentInstances(child);
-    }
-  }
+    
+    return instances;
+  };
   
-  return detachedCount;
+  try {
+    // 收集所有实例节点的ID和深度
+    const instances = collectInstances(node);
+    
+    if (instances.length === 0) {
+      return 0; // 没有实例需要解绑
+    }
+    
+    // 按深度从深到浅排序实例，确保先解绑最深层的子实例
+    instances.sort((a, b) => b.depth - a.depth);
+    
+    // 逐个解绑实例，从最深层开始
+    for (const instance of instances) {
+      try {
+        // 每次都重新获取节点，确保它仍然存在且ID有效
+        const validNode = figma.getNodeById(instance.id);
+        
+        // 只有当节点存在且仍然是实例时才解绑
+        if (validNode && validNode.type === 'INSTANCE') {
+          figma.notify(`解绑组件: ${validNode.name}`);
+          (validNode as InstanceNode).detachInstance();
+          detachedCount++;
+        }
+      } catch (error) {
+        // 如果特定实例解绑失败，记录错误但继续处理其他实例
+        console.warn(`解绑实例时出错: ${instance.id}`, error);
+      }
+    }
+    
+    return detachedCount;
+  } catch (error) {
+    console.error('解绑组件时发生错误:', error);
+    return detachedCount; // 即使出错也返回已解绑的数量
+  }
 };
 
 switch (figma.mode) {
