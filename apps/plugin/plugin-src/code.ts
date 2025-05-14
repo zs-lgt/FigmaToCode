@@ -108,13 +108,15 @@ function traverseTree(node: SceneNode, callback: (node: any) => void) {
 }
 
 // 修改commentCollector函数
-const commentCollector = (nodeId: string, node: SceneNode, data: any) => {
+const commentCollector = (nodeId: string, node: SceneNode, data: any, nodesMap?: Map<string, { node: SceneNode, comment: string[] }>) => {
   if (data.comment) {
     console.log('data.comment', data.comment);
-    (nodesWithComments as any).set(node.id, { 
-      node, 
-      comment: data.comment as string[] 
-    });
+    if (nodesMap) {
+      nodesMap.set(node.id, { 
+        node, 
+        comment: data.comment as string[] 
+      });
+    }
   }
 };
 
@@ -265,17 +267,12 @@ const standardMode = async () => {
       // 创建一个变量来收集有comment的节点及其ID
       const nodesWithComments = new Map<string, { node: SceneNode, comment: string[] }>();
       
-      // 创建一个收集器函数，导入过程中将收集有comment的节点
-      const commentCollector = (nodeId: string, node: SceneNode, data: any) => {
-        if (data.comment) {
-          console.log('data.comment', data.comment);
-          nodesWithComments.set(node.id, { 
-            node, 
-            comment: data.comment as string[] 
-          });
-        }
+      // 使用闭包创建一个收集器函数，将节点信息收集到nodesWithComments中
+      const collector = (nodeId: string, node: SceneNode, data: any) => {
+        commentCollector(nodeId, node, data, nodesWithComments);
       };
-      importFigmaJSON(data, commentCollector).then(async () => {
+      
+      importFigmaJSON(data, collector).then(async () => {
         // 如果有带comments的节点，则创建UX标注
         if (nodesWithComments.size > 0) {
             try {
@@ -715,21 +712,14 @@ const standardMode = async () => {
         // 创建一个变量来收集有comment的节点及其ID
         const nodesWithComments = new Map<string, { node: SceneNode, comment: string[] }>();
         
-        // 创建一个收集器函数，导入过程中将收集有comment的节点
-        const commentCollector = (nodeId: string, node: SceneNode, data: any) => {
-          if (data.comment) {
-            console.log('data.comment', data.comment);
-            // 使用类型断言避免TypeScript错误
-            nodesWithComments.set(node.id, { 
-              node, 
-              comment: data.comment as string[] 
-            });
-          }
+        // 使用闭包创建一个收集器函数
+        const collector = (nodeId: string, node: SceneNode, data: any) => {
+          commentCollector(nodeId, node, data, nodesWithComments);
         };
         
         
         // 导入UI JSON
-        importFigmaJSON(uiData, commentCollector).then(async (importedNodes) => {
+        importFigmaJSON(uiData, collector).then(async (importedNodes) => {
           // 如果有带comments的节点，则创建UX标注
           if (nodesWithComments.size > 0) {
             try {
@@ -797,9 +787,9 @@ const standardMode = async () => {
           }
           
           // 发送进度信息
-          sendProgressInfo(0, 1, 0, 0, '正在分析节点属性...');
+          sendProgressInfo(0, 1, 0, 0, '正在分析节点属性和设计变量...');
           
-          // 调用API
+          // 调用API - 注意：API函数内部会提取设计Token
           const data = await callPropertyStatAPI(nodesInfo, msg.query);
           
           if (data.status === 'success' && data.figma_json_list) {
@@ -817,8 +807,17 @@ const standardMode = async () => {
               // 清除选中节点
               figma.currentPage.selection = [];
               
-              // 删除原节点
-              selectedNode.remove();
+              // 检查是否需要删除原节点
+              const shouldDeleteOrigin = data.delete_origin === true;
+              console.log(`是否删除原节点: ${shouldDeleteOrigin}`);
+              
+              // 只有在delete_origin为true时才删除原节点，否则保留
+              if (shouldDeleteOrigin) {
+                console.log('根据API返回的delete_origin字段，删除原节点');
+                selectedNode.remove();
+              } else {
+                console.log('保留原节点');
+              }
               
               // 更新进度信息
               sendProgressInfo(0, data.figma_json_list.length, 0, 0, '开始导入新组件...');
@@ -850,10 +849,17 @@ const standardMode = async () => {
                           node.parent.appendChild(node);
                         }
                         
-                        // 保持原来的位置
-                        node.x = originalBounds.x;
-                        // 纵向排列，每个新节点比前一个低一些
-                        node.y = originalBounds.y + i * (node.height + 20);
+                        // 如果保留了原节点，新节点位置需要做相应调整
+                        if (!shouldDeleteOrigin && i === 0) {
+                          // 第一个新节点放在原节点旁边
+                          node.x = originalBounds.x + selectedNode.width + 20;
+                          node.y = originalBounds.y;
+                        } else {
+                          // 其他节点保持原来的位置规则
+                          node.x = originalBounds.x;
+                          // 纵向排列，每个新节点比前一个低一些
+                          node.y = originalBounds.y + i * (node.height + 20);
+                        }
                       });
                     }
                     
@@ -878,14 +884,25 @@ const standardMode = async () => {
               
               // 选中所有导入的节点
               if (importedNodes.length > 0) {
-                figma.currentPage.selection = importedNodes;
+                // 如果保留了原节点，则同时选中原节点和新节点
+                if (!shouldDeleteOrigin) {
+                  figma.currentPage.selection = [selectedNode, ...importedNodes];
+                } else {
+                  figma.currentPage.selection = importedNodes;
+                }
                 figma.viewport.scrollAndZoomIntoView(importedNodes);
                 
                 // 将最后一个节点的llmout作为消息
                 const message = data.llmout || `成功导入了${importedNodes.length}个组件`;
                 sendResultMessage(true, "property-stat", message);
               } else {
-                throw new Error('没有成功导入任何组件');
+                // 如果没有成功导入节点但保留了原节点，仍然选中原节点
+                if (!shouldDeleteOrigin) {
+                  figma.currentPage.selection = [selectedNode];
+                  sendResultMessage(true, "property-stat", data.llmout || "没有可导入的新组件，保留了原始节点");
+                } else {
+                  throw new Error('没有成功导入任何组件');
+                }
               }
             } catch (error: any) {
               console.error('处理返回的JSON失败:', error);
@@ -926,7 +943,7 @@ const codegenMode = async () => {
               convertedSelection,
               { ...userPluginSettings, jsx: false },
               true,
-            ),
+            ) as unknown as string,
             language: "HTML",
           },
           {
@@ -944,7 +961,7 @@ const codegenMode = async () => {
               convertedSelection,
               { ...userPluginSettings, jsx: true },
               true,
-            ),
+            ) as unknown as string,
             language: "HTML",
           },
           {
@@ -962,7 +979,7 @@ const codegenMode = async () => {
             code: tailwindMain(convertedSelection, {
               ...userPluginSettings,
               jsx: language === 'tailwind_jsx',
-            }),
+            }) as unknown as string,
             language: "HTML",
           },
           {
@@ -1188,25 +1205,437 @@ const sendProgressInfo = (current: number, total: number, success: number, failu
   });
 };
 
+// 添加一个提取节点中变量Token的辅助函数
+const extractDesignTokens = async (nodeData: any): Promise<any[]> => {
+  console.log('开始提取设计变量Token...');
+  const tokens: any[] = [];
+  const processedIds = new Set<string>(); // 避免重复处理同一个变量ID
+  const variableCache = new Map<string, any>(); // 缓存已获取的变量数据
+  const componentCache = new Map<string, any>(); // 缓存已获取的组件数据
+  let instanceCount = 0; // 统计处理的实例节点数
+  let variableCount = 0; // 统计提取的变量数
+  
+  // 处理单个boundVariables对象
+  const processBoundVariables = (boundVars: any, parentKey: string = '') => {
+    // 遍历boundVariables的所有属性
+    for (const propKey in boundVars) {
+      const varRef = boundVars[propKey];
+      
+      // 处理数组类型的变量引用
+      if (Array.isArray(varRef)) {
+        varRef.forEach(item => {
+          if (item && item.type === 'VARIABLE_ALIAS' && item.id) {
+            addToken(item.id, parentKey + '.' + propKey);
+          }
+        });
+      } 
+      // 处理单个变量引用
+      else if (varRef && varRef.type === 'VARIABLE_ALIAS' && varRef.id) {
+        addToken(varRef.id, parentKey + '.' + propKey);
+      }
+    }
+  };
+  
+  // 获取变量数据并缓存
+  const getVariableData = (id: string): any => {
+    // 如果缓存中已有此变量，直接返回
+    if (variableCache.has(id)) {
+      return variableCache.get(id);
+    }
+    
+    try {
+      const variable = figma.variables.getVariableById(id);
+      if (variable) {
+        console.log('获取变量数据:', variable.name, id);
+        
+        // 创建变量数据对象
+        const variableData: any = {
+          id: id,
+          name: variable.name,
+          type: variable.resolvedType,
+          key: variable.key,
+          remote: variable.remote,
+          valuesByMode: { ...variable.valuesByMode } // 克隆一份valuesByMode
+        };
+        
+        // 缓存变量数据
+        variableCache.set(id, variableData);
+        return variableData;
+      }
+    } catch (error) {
+      console.warn(`无法获取变量信息，ID: ${id}`, error);
+    }
+    return null;
+  };
+  
+  // 处理变量的valuesByMode属性中的嵌套变量引用
+  const resolveNestedVariables = (variableData: any) => {
+    if (!variableData || !variableData.valuesByMode) return;
+    
+    // 遍历所有模式
+    for (const modeId in variableData.valuesByMode) {
+      const modeValue = variableData.valuesByMode[modeId];
+      
+      // 如果模式值是变量引用
+      if (modeValue && typeof modeValue === 'object' &&
+          'type' in modeValue && modeValue.type === 'VARIABLE_ALIAS' &&
+          'id' in modeValue && modeValue.id) {
+        
+        // 获取引用的变量数据
+        const nestedVarData = getVariableData(modeValue.id);
+        
+        // 如果获取成功，将引用的变量数据合并到当前模式值中
+        if (nestedVarData) {
+          // 保留原始引用信息
+          const originalRef = { ...modeValue };
+          
+          // 在模式值中添加引用变量的完整信息
+          modeValue.name = nestedVarData.name;
+          modeValue.type = nestedVarData.type;
+          modeValue.key = nestedVarData.key;
+          modeValue.remote = nestedVarData.remote;
+          modeValue.valuesByMode = nestedVarData.valuesByMode;
+          
+          // 如果需要，也可以添加引用变量的值
+          if (nestedVarData.valuesByMode && nestedVarData.valuesByMode[modeId]) {
+            modeValue.resolvedValue = nestedVarData.valuesByMode[modeId];
+          }
+        }
+      }
+    }
+  };
+  
+  // 添加Token到结果中
+  const addToken = (id: string, propertyPath: string) => {
+    // 避免重复处理同一个变量ID
+    if (!processedIds.has(id)) {
+      processedIds.add(id);
+      
+      // 获取变量信息
+      const variableData = getVariableData(id);
+      if (variableData) {
+        // 添加路径信息
+        variableData.path = propertyPath.startsWith('.') ? propertyPath.substring(1) : propertyPath;
+        
+        // 解析嵌套变量
+        resolveNestedVariables(variableData);
+        
+        // 添加处理后的变量数据到结果中
+        tokens.push(variableData);
+        variableCount++;
+      }
+    }
+  };
+  
+  // 辅助函数：尝试以多种方式获取实例节点的组件Key
+  const getComponentKey = (node: any): string | null => {
+    if (!node || node.type !== 'INSTANCE') return null;
+    
+    // 直接从node.componentKey获取
+    if (node.componentKey) return node.componentKey;
+    
+    // 如果没有componentKey但有componentId
+    if (node.componentId) {
+      try {
+        // 尝试通过componentId查找主组件
+        const instanceNode = figma.getNodeById(node.id) as InstanceNode;
+        if (instanceNode && instanceNode.mainComponent) {
+          return instanceNode.mainComponent.key;
+        }
+      } catch (error) {
+        console.warn(`通过componentId获取组件Key失败:`, error);
+      }
+    }
+    
+    return null;
+  };
+  
+  // 获取组件的完整信息
+  const getComponentData = async (componentKey: string): Promise<any> => {
+    // 如果缓存中已有此组件，直接返回
+    if (componentCache.has(componentKey)) {
+      return componentCache.get(componentKey);
+    }
+    
+    try {
+      // 查找具有给定componentKey的组件
+      const component = figma.getNodeById(componentKey) as ComponentNode || 
+                        figma.root.findOne(node => 
+                          node.type === 'COMPONENT' && 
+                          (node as ComponentNode).key === componentKey
+                        ) as ComponentNode;
+      
+      if (component) {
+        console.log('找到组件:', component.name, componentKey);
+        
+        // 使用getNodeInfo获取完整的组件信息
+        const getNodeInfo = (node: SceneNode): any => {
+          const nodeInfo: any = {
+            id: node.id,
+            name: node.name,
+            type: node.type,
+          };
+
+          // 基本属性
+          if ('visible' in node) nodeInfo.visible = node.visible;
+          if ('opacity' in node) nodeInfo.opacity = node.opacity;
+          if ('blendMode' in node) nodeInfo.blendMode = node.blendMode;
+          if ('isMask' in node) nodeInfo.isMask = node.isMask;
+          if ('effects' in node) nodeInfo.effects = node.effects;
+          if ('effectStyleId' in node) nodeInfo.effectStyleId = node.effectStyleId;
+          if ('exportSettings' in node) nodeInfo.exportSettings = node.exportSettings;
+
+          // 布局属性
+          if ('x' in node) nodeInfo.x = node.x;
+          if ('y' in node) nodeInfo.y = node.y;
+          if ('width' in node) nodeInfo.width = node.width;
+          if ('height' in node) nodeInfo.height = node.height;
+          if ('rotation' in node) nodeInfo.rotation = node.rotation;
+          if ('layoutAlign' in node) nodeInfo.layoutAlign = node.layoutAlign;
+          if ('constrainProportions' in node) nodeInfo.constrainProportions = node.constrainProportions;
+          if ('layoutGrow' in node) nodeInfo.layoutGrow = node.layoutGrow;
+          if ('layoutPositioning' in node) nodeInfo.layoutPositioning = node.layoutPositioning;
+          if ('layoutSizingHorizontal' in node) nodeInfo.layoutSizingHorizontal = node.layoutSizingHorizontal;
+          if ('layoutSizingVertical' in node) nodeInfo.layoutSizingVertical = node.layoutSizingVertical;
+          if ('maxWidth' in node) nodeInfo.maxWidth = node.maxWidth;
+          if ('maxHeight' in node) nodeInfo.maxHeight = node.maxHeight;
+          if ('minWidth' in node) nodeInfo.minWidth = node.minWidth;
+          if ('minHeight' in node) nodeInfo.minHeight = node.minHeight;
+
+          // 约束属性
+          if ('constraints' in node) nodeInfo.constraints = node.constraints;
+
+          // 变换属性
+          if ('absoluteBoundingBox' in node) nodeInfo.absoluteBoundingBox = node.absoluteBoundingBox;
+          if ('absoluteRenderBounds' in node) nodeInfo.absoluteRenderBounds = node.absoluteRenderBounds;
+          if ('absoluteTransform' in node) nodeInfo.absoluteTransform = node.absoluteTransform;
+
+          // 填充和描边属性
+          if ('fills' in node) nodeInfo.fills = node.fills;
+          if ('strokes' in node) nodeInfo.strokes = node.strokes;
+          if ('strokeWeight' in node) nodeInfo.strokeWeight = node.strokeWeight;
+          if ('strokeAlign' in node) nodeInfo.strokeAlign = node.strokeAlign;
+          if ('strokeCap' in node) nodeInfo.strokeCap = node.strokeCap;
+          if ('strokeJoin' in node) nodeInfo.strokeJoin = node.strokeJoin;
+          if ('strokeMiterLimit' in node) nodeInfo.strokeMiterLimit = node.strokeMiterLimit;
+          if ('dashPattern' in node) nodeInfo.dashPattern = node.dashPattern;
+          if ('fillStyleId' in node) nodeInfo.fillStyleId = node.fillStyleId;
+          if ('strokeStyleId' in node) nodeInfo.strokeStyleId = node.strokeStyleId;
+          if ('fillGeometry' in node) nodeInfo.fillGeometry = node.fillGeometry;
+          if ('strokeGeometry' in node) nodeInfo.strokeGeometry = node.strokeGeometry;
+          
+          // 重要：检查boundVariables属性
+          if ('boundVariables' in node) nodeInfo.boundVariables = node.boundVariables;
+
+          // 文本特有属性
+          if (node.type === "TEXT") {
+            const textNode = node as TextNode;
+            nodeInfo.characters = textNode.characters;
+            nodeInfo.fontSize = textNode.fontSize;
+            nodeInfo.fontName = textNode.fontName;
+            nodeInfo.textAlignHorizontal = textNode.textAlignHorizontal;
+            nodeInfo.textAlignVertical = textNode.textAlignVertical;
+            nodeInfo.textAutoResize = textNode.textAutoResize;
+            nodeInfo.textCase = textNode.textCase;
+            nodeInfo.textDecoration = textNode.textDecoration;
+            nodeInfo.letterSpacing = textNode.letterSpacing;
+            nodeInfo.lineHeight = textNode.lineHeight;
+            nodeInfo.textStyleId = textNode.textStyleId;
+          }
+
+          // 组件特有属性
+          if (node.type === 'COMPONENT') {
+            nodeInfo.componentPropertyDefinitions = (node as ComponentNode).componentPropertyDefinitions;
+            nodeInfo.componentKey = (node as ComponentNode).key;
+          }
+
+          // 递归处理子节点
+          if ('children' in node && node.children) {
+            nodeInfo.children = [];
+            for (const child of node.children) {
+              nodeInfo.children.push(getNodeInfo(child));
+            }
+          }
+
+          return nodeInfo;
+        };
+        
+        // 获取完整的组件数据
+        const componentData = getNodeInfo(component);
+        console.log('获取到组件数据:', componentData);
+        
+        // 缓存组件数据
+        componentCache.set(componentKey, componentData);
+        return componentData;
+      }
+    } catch (error) {
+      console.warn(`无法获取组件信息，Key: ${componentKey}`, error);
+    }
+    return null;
+  };
+  
+  // 处理实例节点，尝试从其主组件获取设计令牌
+  const processInstanceNode = async (node: any): Promise<void> => {
+    if (node.type !== 'INSTANCE' || !node.componentKey) return;
+    
+    try {
+      console.log('处理实例节点:', node.name, node.id, '组件Key:', node.componentKey);
+      instanceCount++;
+      
+      // 获取实例对应的主组件数据
+      const componentData = await getComponentData(node.componentKey);
+      
+      if (componentData) {
+        console.log('成功获取主组件数据:', componentData.name);
+        
+        // 获取当前tokens长度，用于后续标记新添加的tokens
+        const beforeCount = tokens.length;
+        
+        // 从主组件中搜索变量引用
+        await searchForBoundVariables(componentData, 'mainComponent');
+        
+        // 计算新增的token数量
+        const newTokenCount = tokens.length - beforeCount;
+        
+        // 修改最近添加的token，添加实例关联信息
+        if (newTokenCount > 0) {
+          console.log(`从主组件[${componentData.name}]中提取了${newTokenCount}个设计变量`);
+          
+          // 从后向前查找，处理新添加的tokens
+          for (let i = tokens.length - 1; i >= beforeCount; i--) {
+            const token = tokens[i];
+            // 添加原始实例的ID和名称作为关联
+            token.instanceId = node.id;
+            token.instanceName = node.name;
+            // 修改路径前缀，使其更有意义
+            token.path = token.path.replace('mainComponent', `instance(${node.id})`);
+          }
+        } else {
+          console.log(`主组件[${componentData.name}]中未找到设计变量`);
+        }
+      } else {
+        console.warn(`无法获取实例节点的主组件数据, 实例ID: ${node.id}, 组件Key: ${node.componentKey}`);
+      }
+    } catch (error) {
+      console.warn(`处理实例节点失败，ID: ${node.id}`, error);
+    }
+  };
+  
+  // 递归搜索对象中的所有boundVariables
+  const searchForBoundVariables = async (obj: any, path: string = ''): Promise<void> => {
+    if (!obj || typeof obj !== 'object') return;
+    
+    // 优先处理INSTANCE节点
+    if (obj.type === 'INSTANCE') {
+      const componentKey = getComponentKey(obj);
+      if (componentKey) {
+        obj.componentKey = componentKey; // 确保componentKey存在
+        await processInstanceNode(obj);
+      }
+    }
+    
+    // 直接检查当前对象是否有boundVariables
+    if (obj.boundVariables) {
+      processBoundVariables(obj.boundVariables, path);
+    }
+    
+    // 特别处理fills和strokes数组
+    if (Array.isArray(obj.fills)) {
+      for (let i = 0; i < obj.fills.length; i++) {
+        const fill = obj.fills[i];
+        const fillPath = `${path}.fills[${i}]`;
+        await searchForBoundVariables(fill, fillPath);
+      }
+    }
+    
+    if (Array.isArray(obj.strokes)) {
+      for (let i = 0; i < obj.strokes.length; i++) {
+        const stroke = obj.strokes[i];
+        const strokePath = `${path}.strokes[${i}]`;
+        await searchForBoundVariables(stroke, strokePath);
+      }
+    }
+    
+    // 处理effects数组
+    if (Array.isArray(obj.effects)) {
+      for (let i = 0; i < obj.effects.length; i++) {
+        const effect = obj.effects[i];
+        const effectPath = `${path}.effects[${i}]`;
+        await searchForBoundVariables(effect, effectPath);
+      }
+    }
+    
+    // 处理children数组
+    if (Array.isArray(obj.children)) {
+      for (let i = 0; i < obj.children.length; i++) {
+        const child = obj.children[i];
+        await searchForBoundVariables(child, `${path}.children[${i}]`);
+      }
+    }
+    
+    // 检查其他可能包含boundVariables的属性
+    for (const key in obj) {
+      // 跳过已处理的数组属性
+      if (key === 'fills' || key === 'strokes' || key === 'effects' || 
+          key === 'children' || key === 'boundVariables') continue;
+      
+      const value = obj[key];
+      if (value && typeof value === 'object') {
+        const newPath = path ? `${path}.${key}` : key;
+        await searchForBoundVariables(value, newPath);
+      }
+    }
+  };
+  
+  // 开始递归搜索
+  await searchForBoundVariables(nodeData);
+  
+  console.log(`设计变量Token提取完成：处理了${instanceCount}个实例节点，找到${variableCount}个变量。`);
+  return tokens;
+};
+
 // 属性统计API
 const callPropertyStatAPI = async (figma_json: any, query: string, traceId: string = '123') => {
+  // 显示进度信息
+  sendProgressInfo(0, 1, 0, 0, '正在分析节点属性和设计变量...');
+  
+  console.log('开始提取设计变量Token数据...');
+  
+  // 提取设计Token信息
+  const designTokens = await extractDesignTokens(figma_json);
+  
+  console.log(`提取了${designTokens.length}个设计变量Token`);
+  
+  // 更新进度信息
+  sendProgressInfo(0.5, 1, 0, 0, `设计变量分析完成，提取了${designTokens.length}个令牌，准备发送API请求...`);
+  
+  // API请求体
+  const requestBody = {
+    figma_json: JSON.stringify(figma_json),
+    query,
+    design_token: designTokens,
+    traceId
+  };
+  
+  console.log('发送API请求...');
+  
   const API_BASE_URL = 'https://occ.10jqka.com.cn/figma2code/webapi_fuzz/v1/html2figma';
   const response = await fetch(`${API_BASE_URL}`, {
     method: 'POST',
     headers: {},
-    body: JSON.stringify({
-      figma_json: JSON.stringify(figma_json),
-      query,
-      traceId
-    })
+    body: JSON.stringify(requestBody)
   });
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
 
+  // 更新进度信息
+  sendProgressInfo(1, 1, 1, 0, 'API请求完成');
+
   // 明确返回值类型为any以避免Promise<string>和string类型不匹配
   const result: any = await response.json();
+  console.log('API响应成功');
   return result;
 };
 
