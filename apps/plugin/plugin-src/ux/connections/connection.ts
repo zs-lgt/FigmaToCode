@@ -193,7 +193,7 @@ export class Connection {
   }
 
   // 创建连接线
-  public create(start: SceneNode, end: SceneNode): GroupNode | null {
+  public create(start: SceneNode, end: SceneNode, content = '请输入'): GroupNode | null {
     try {
       // 添加前置校验
       if (!this.validateNode(start) || !this.validateNode(end)) {
@@ -338,7 +338,7 @@ export class Connection {
       textNode.name = "连接线文本";
       textNode.fontSize = 12;
       textNode.fills = [{ type: "SOLID", color: { r: 0, g: 0, b: 0 } }];
-      textNode.characters = "请输入";
+      textNode.characters = content;
 
       // 创建frame
       const textFrame = figma.createFrame();

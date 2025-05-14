@@ -756,11 +756,11 @@ const standardMode = async () => {
         }
         // 创建一个变量来收集有comment的节点及其ID
         const nodesWithComments = new Map<string, { node: SceneNode, comment: string[] }>();
+        // 建立一个json id到figma id的映射map
+        const nodeIdMap = new Map<string, string>()
         
         // 使用闭包创建一个收集器函数
         const collector = (originalNodeId: string, node: SceneNode, data: any) => {
-          // 建立一个json id到figma id的映射map
-          const nodeIdMap = new Map<string, string>()
           
           if (data.comment) {
             console.log('data.comment', data.comment);
@@ -804,7 +804,7 @@ const standardMode = async () => {
             const realEdges = edges.map(edge => ({
               ...edge,
               start: nodeIdMap.get(edge.start),
-              end: nodeIdMap.get(edge.end)
+              end: nodeIdMap.get(edge.end),
             })) as Edge[]
             console.log('real', realEdges, edges)
             connectionFactory.createConnections(realEdges)

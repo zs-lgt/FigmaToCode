@@ -5,7 +5,7 @@ export interface Edge {
   id: string
   start: string,
   end: string,
-  content: string,
+  content: string[],
 }
 
 /**
@@ -51,12 +51,7 @@ export class ConnectionFactory {
       }
       console.log(111)
       // 创建连接线
-      const connectionGroup = this.connection.create(startNode, endNode);
-
-      // 添加文本到连接线
-      if (connectionGroup && content) {
-        await this.connection.addTextToConnection(connectionGroup, content);
-      }
+      const connectionGroup = this.connection.create(startNode, endNode, content.join('\n'));
     }
   }
 }
