@@ -116,18 +116,18 @@ function traverseTree(node: SceneNode, callback: (node: any) => void) {
   }
 }
 
-// 修改commentCollector函数
-const commentCollector = (nodeId: string, node: SceneNode, data: any, nodesMap?: Map<string, { node: SceneNode, comment: string[] }>) => {
-  if (data.comment) {
-    console.log('data.comment', data.comment);
-    if (nodesMap) {
-      nodesMap.set(node.id, { 
-        node, 
-        comment: data.comment as string[] 
-      });
-    }
-  }
-};
+// // 修改commentCollector函数
+// const commentCollector = (nodeId: string, node: SceneNode, data: any, nodesMap?: Map<string, { node: SceneNode, comment: string[] }>) => {
+//   if (data.comment) {
+//     console.log('data.comment', data.comment);
+//     if (nodesMap) {
+//       nodesMap.set(node.id, { 
+//         node, 
+//         comment: data.comment as string[] 
+//       });
+//     }
+//   }
+// };
 
 const standardMode = async () => {
   figma.showUI(__html__, { 
@@ -736,16 +736,18 @@ const standardMode = async () => {
         let uxCommentsMap: Map<string, string[]> | null = new Map();
         if (uxJson) {
           try {
-            const { commentsMap: uxCommentsMap } = extractMapsFromUxData(uxData);
+            const { commentsMap } = extractMapsFromUxData(uxData);
+            uxCommentsMap = commentsMap
             console.log('uxCommentsMap', uxCommentsMap);
           } catch (error) {
             console.error('解析UX数据失败:', error);
             figma.notify('UX数据格式无效，仅导入UI部分', { error: true });
           }
         }
-        
+
         // 如果uxCommentsMap有数据，则遍历uiData，将comments添加到node的comment属性中
         if (uxCommentsMap.size) {
+          console.log(1111)
           traverseTree(uiData[0], (node) => {
             const comments = uxCommentsMap.get(node.id);
             if (comments) {
@@ -761,7 +763,6 @@ const standardMode = async () => {
         
         // 使用闭包创建一个收集器函数
         const collector = (originalNodeId: string, node: SceneNode, data: any) => {
-          
           if (data.comment) {
             console.log('data.comment', data.comment);
             nodesWithComments.set(node.id, { node, comment: data.comment });
