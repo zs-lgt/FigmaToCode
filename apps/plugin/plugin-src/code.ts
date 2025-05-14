@@ -99,13 +99,24 @@ function extractCommentsFromUxData(uxData: any): Map<string, string[]> {
   return commentsMap;
 }
 
-// 遍历树
-function traverseTree(node: any, callback: (node: SceneNode) => void) {
+// 修改traverseTree函数
+function traverseTree(node: SceneNode, callback: (node: any) => void) {
   callback(node);
-  if (node.children) {
-    node.children.forEach(child => traverseTree(child, callback));
+  if ('children' in node) {
+    (node.children as SceneNode[]).forEach(child => traverseTree(child, callback));
   }
 }
+
+// 修改commentCollector函数
+const commentCollector = (nodeId: string, node: SceneNode, data: any) => {
+  if (data.comment) {
+    console.log('data.comment', data.comment);
+    (nodesWithComments as any).set(node.id, { 
+      node, 
+      comment: data.comment as string[] 
+    });
+  }
+};
 
 const standardMode = async () => {
   figma.showUI(__html__, { 
@@ -257,7 +268,11 @@ const standardMode = async () => {
       // 创建一个收集器函数，导入过程中将收集有comment的节点
       const commentCollector = (nodeId: string, node: SceneNode, data: any) => {
         if (data.comment) {
-          nodesWithComments.set(node.id, { node, comment: data.comment });
+          console.log('data.comment', data.comment);
+          nodesWithComments.set(node.id, { 
+            node, 
+            comment: data.comment as string[] 
+          });
         }
       };
       importFigmaJSON(data, commentCollector).then(async () => {
@@ -704,7 +719,11 @@ const standardMode = async () => {
         const commentCollector = (nodeId: string, node: SceneNode, data: any) => {
           if (data.comment) {
             console.log('data.comment', data.comment);
-            nodesWithComments.set(node.id, { node, comment: data.comment });
+            // 使用类型断言避免TypeScript错误
+            nodesWithComments.set(node.id, { 
+              node, 
+              comment: data.comment as string[] 
+            });
           }
         };
         
@@ -757,6 +776,133 @@ const standardMode = async () => {
           data: `解析UI+UX数据失败: ${error.message}`,
         });
       }
+    } else if (msg.type === 'property-stat') {
+      (async () => {
+        try {
+          // 检查是否有选中的节点
+          const selection = figma.currentPage.selection;
+          if (selection.length === 0) {
+            throw new Error('请先选择要分析的节点');
+          }
+          
+          // 只取第一个选中的节点
+          const selectedNode = selection[0];
+          
+          // 将选中节点导出为JSON
+          const exportResult = await exportNodes([selectedNode], false, false);
+          const { nodesInfo } = exportResult;
+          
+          if (!nodesInfo || nodesInfo.length === 0) {
+            throw new Error('导出节点信息失败');
+          }
+          
+          // 发送进度信息
+          sendProgressInfo(0, 1, 0, 0, '正在分析节点属性...');
+          
+          // 调用API
+          const data = await callPropertyStatAPI(nodesInfo, msg.query);
+          
+          if (data.status === 'success' && data.figma_json_list) {
+            try {
+              // 记录原节点的位置和父节点
+              const originalParent = selectedNode.parent;
+              const originalBounds = {
+                x: selectedNode.x,
+                y: selectedNode.y
+              };
+              
+              // 获取原有的历史记录
+              const existingHistoryArray = getHistoryData(selectedNode);
+              
+              // 清除选中节点
+              figma.currentPage.selection = [];
+              
+              // 删除原节点
+              selectedNode.remove();
+              
+              // 更新进度信息
+              sendProgressInfo(0, data.figma_json_list.length, 0, 0, '开始导入新组件...');
+              
+              // 依次导入每个figma_json
+              const importedNodes: SceneNode[] = [];
+              let successCount = 0;
+              let failureCount = 0;
+              
+              for (let i = 0; i < data.figma_json_list.length; i++) {
+                try {
+                  // 更新进度
+                  sendProgressInfo(i, data.figma_json_list.length, successCount, failureCount, `正在导入第${i+1}/${data.figma_json_list.length}个组件...`);
+                  
+                  // 解析JSON
+                  const jsonData = typeof data.figma_json_list[i] === 'string' 
+                    ? JSON.parse(data.figma_json_list[i]) 
+                    : data.figma_json_list[i];
+                  
+                  // 导入节点
+                  const nodes = await importFigmaJSON(jsonData);
+                  
+                  if (nodes && nodes.length > 0) {
+                    // 将新节点添加到原节点的父节点
+                    if (originalParent && 'appendChild' in originalParent) {
+                      // 如果导入过程中节点已经有了父节点，先移除
+                      nodes.forEach(node => {
+                        if (node.parent) {
+                          node.parent.appendChild(node);
+                        }
+                        
+                        // 保持原来的位置
+                        node.x = originalBounds.x;
+                        // 纵向排列，每个新节点比前一个低一些
+                        node.y = originalBounds.y + i * (node.height + 20);
+                      });
+                    }
+                    
+                    // 收集导入的节点
+                    importedNodes.push(...nodes);
+                    successCount++;
+                  }
+                } catch (error) {
+                  console.error(`导入第${i+1}个组件失败:`, error);
+                  failureCount++;
+                }
+              }
+              
+              // 完成进度信息
+              sendProgressInfo(
+                data.figma_json_list.length, 
+                data.figma_json_list.length, 
+                successCount, 
+                failureCount, 
+                '所有组件导入完成!'
+              );
+              
+              // 选中所有导入的节点
+              if (importedNodes.length > 0) {
+                figma.currentPage.selection = importedNodes;
+                figma.viewport.scrollAndZoomIntoView(importedNodes);
+                
+                // 将最后一个节点的llmout作为消息
+                const message = data.llmout || `成功导入了${importedNodes.length}个组件`;
+                sendResultMessage(true, "property-stat", message);
+              } else {
+                throw new Error('没有成功导入任何组件');
+              }
+            } catch (error: any) {
+              console.error('处理返回的JSON失败:', error);
+              throw new Error(`处理返回的JSON失败: ${error.message}`);
+            }
+          } else {
+            throw new Error(`API返回状态错误: ${data.status || '未知错误'}`);
+          }
+        } catch (error: any) {
+          const errorMessage = error instanceof Error ? error.message : '未知错误';
+          console.error('属性统计分析失败:', error);
+          sendResultMessage(false, "property-stat", `属性统计分析失败: ${errorMessage}`);
+          
+          // 更新进度信息为失败状态
+          sendProgressInfo(0, 1, 0, 1, `处理失败: ${errorMessage}`);
+        }
+      })();
     }
   });
 };
@@ -1040,6 +1186,28 @@ const sendProgressInfo = (current: number, total: number, success: number, failu
       message
     }
   });
+};
+
+// 属性统计API
+const callPropertyStatAPI = async (figma_json: any, query: string, traceId: string = '123') => {
+  const API_BASE_URL = 'https://occ.10jqka.com.cn/figma2code/webapi_fuzz/v1/html2figma';
+  const response = await fetch(`${API_BASE_URL}`, {
+    method: 'POST',
+    headers: {},
+    body: JSON.stringify({
+      figma_json: JSON.stringify(figma_json),
+      query,
+      traceId
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  // 明确返回值类型为any以避免Promise<string>和string类型不匹配
+  const result: any = await response.json();
+  return result;
 };
 
 switch (figma.mode) {

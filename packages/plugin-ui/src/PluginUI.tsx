@@ -142,6 +142,8 @@ export const PluginUI = (props: PluginUIProps) => {
   const [showUiUxModal, setShowUiUxModal] = useState(false);
   const [uiJsonFile, setUiJsonFile] = useState<File | null>(null);
   const [uxJsonFile, setUxJsonFile] = useState<File | null>(null);
+  const [showPropertyStatModal, setShowPropertyStatModal] = useState(false);
+  const [propertyStatInput, setPropertyStatInput] = useState('');
   const imageInputRef = useRef<HTMLInputElement>(null);
   const uiJsonFileRef = useRef<HTMLInputElement>(null);
   const uxJsonFileRef = useRef<HTMLInputElement>(null);
@@ -187,11 +189,14 @@ export const PluginUI = (props: PluginUIProps) => {
         } else if (message.source === 'modify-component') {
           setShowModifyComponentModal(false);
           setModifyComponentInput('');
+        } else if (message.source === 'property-stat') {
+          setShowPropertyStatModal(false);
+          setPropertyStatInput('');
         }
         
         // 使用Modal显示成功消息（除HTML2Figma外）
         if (message.source === 'nl2figma' || message.source === 'img2figma' || 
-            message.source === 'modify-component') {
+            message.source === 'modify-component' || message.source === 'property-stat') {
           setModalMessage(message.data);
           setIsModalOpen(true);
         }
@@ -203,12 +208,12 @@ export const PluginUI = (props: PluginUIProps) => {
         
         // 使用Modal显示错误消息
         if (message.source === 'nl2figma' || message.source === 'img2figma' || 
-            message.source === 'modify-component') {
+            message.source === 'modify-component' || message.source === 'property-stat') {
           setModalMessage(message.data);
           setIsModalOpen(true);
           
           // 如果是修改组件的错误，留在模态框中
-          if (message.source === 'modify-component') {
+          if (message.source === 'modify-component' || message.source === 'property-stat') {
             // 不关闭模态框，让用户可以尝试修改查询
           } else {
             // 其他情况关闭相应的模态框
@@ -240,6 +245,16 @@ export const PluginUI = (props: PluginUIProps) => {
         // 现有代码
       } else if (message.type === "html2figma-progress") {
         // 处理HTML2Figma进度信息
+        setImportProgress({
+          isActive: true,
+          current: message.data.current,
+          total: message.data.total,
+          success: message.data.success,
+          failure: message.data.failure,
+          message: message.data.message || ''
+        });
+      } else if (message.type === "property-stat-progress") {
+        // 处理属性统计进度信息
         setImportProgress({
           isActive: true,
           current: message.data.current,
@@ -677,6 +692,71 @@ export const PluginUI = (props: PluginUIProps) => {
     uiReader.readAsText(uiJsonFile);
   };
 
+  // 添加属性统计&&修改功能处理函数
+  const handlePropertyStatClick = () => {
+    // 检查是否有选中的节点
+    window.parent.postMessage(
+      { 
+        pluginMessage: { 
+          type: "check-selection"
+        } 
+      },
+      "*"
+    );
+    
+    // 打开属性统计&&修改模态框
+    setShowPropertyStatModal(true);
+  };
+
+  const closePropertyStatModal = () => {
+    setShowPropertyStatModal(false);
+    setPropertyStatInput(''); // 清空输入框
+  };
+
+  const handlePropertyStatSubmit = () => {
+    try {
+      if (!selectedNodeName) {
+        setModalMessage('请先选择要分析的节点');
+        setIsModalOpen(true);
+        return;
+      }
+      
+      setIsLoading(true);
+      // 重置并激活进度状态
+      setImportProgress({
+        isActive: true,
+        current: 0,
+        total: 0,
+        success: 0,
+        failure: 0,
+        message: '准备分析...'
+      });
+      
+      // 发送消息到插件后端处理API调用
+      window.parent.postMessage(
+        { 
+          pluginMessage: { 
+            type: "property-stat",
+            query: propertyStatInput
+          } 
+        },
+        "*"
+      );
+    } catch (error: any) {
+      setIsLoading(false);
+      setImportProgress({
+        isActive: false,
+        current: 0,
+        total: 0,
+        success: 0,
+        failure: 0,
+        message: ''
+      });
+      console.error('发送请求失败:', error);
+      alert(`发送请求失败: ${error.message}`);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full dark:text-white">
       <div className="p-2 grid grid-cols-4 sm:grid-cols-2 md:grid-cols-4 gap-1">
@@ -761,6 +841,12 @@ export const PluginUI = (props: PluginUIProps) => {
               className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
             >
               修改组件
+            </button>
+            <button
+              onClick={handlePropertyStatClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              属性统计&&修改
             </button>
             <button
               onClick={() => setShowUxImportModal(true)}
@@ -1370,6 +1456,70 @@ export const PluginUI = (props: PluginUIProps) => {
                   取消
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 属性统计&&修改模态框 */}
+      {showPropertyStatModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium dark:text-white">属性统计 && 修改</h3>
+              {isLoading && (
+                <div className="flex items-center text-sm text-blue-600 dark:text-blue-400">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  处理中...
+                </div>
+              )}
+            </div>
+            
+            {selectedNodeName ? (
+              <div className="mb-4 p-2 bg-blue-50 dark:bg-blue-900 rounded-md">
+                <span className="text-sm text-blue-800 dark:text-blue-200">
+                  当前选中节点: <strong>{selectedNodeName}</strong>
+                </span>
+              </div>
+            ) : (
+              <div className="mb-4 p-2 bg-yellow-50 dark:bg-yellow-900 rounded-md">
+                <span className="text-sm text-yellow-800 dark:text-yellow-200">
+                  请先在画布中选择一个节点
+                </span>
+              </div>
+            )}
+            
+            <textarea
+              value={propertyStatInput}
+              onChange={(e) => setPropertyStatInput(e.target.value)}
+              className="w-full h-32 p-2 border rounded-md mb-4 dark:bg-gray-700 dark:text-white"
+              placeholder="请输入您需要进行的属性分析和修改需求..."
+              disabled={isLoading}
+            />
+            
+            {/* 添加进度条组件 */}
+            <ImportProgress progress={importProgress} />
+            
+            <div className="flex justify-end space-x-2 mt-4">
+              <button
+                onClick={closePropertyStatModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                disabled={isLoading}
+              >
+                取消
+              </button>
+              <button
+                onClick={handlePropertyStatSubmit}
+                className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                  isLoading || !selectedNodeName ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+                disabled={isLoading || !selectedNodeName}
+              >
+                提交
+              </button>
             </div>
           </div>
         </div>
