@@ -552,6 +552,13 @@ export class SVGNodeCreator extends BaseNodeCreator {
       svgNode.setPluginData('isSvgNode', 'true');
       svgNode.setPluginData('originalSvgContent', data.svg);
       
+      // 显示导入成功的提示
+      figma.notify('SVG导入成功', { timeout: 2000 });
+      
+      // 选中SVG节点并滚动到视图中
+      figma.currentPage.selection = [svgNode];
+      figma.viewport.scrollAndZoomIntoView([svgNode]);
+      
       return svgNode;
     } catch (error) {
       console.error('创建SVG节点时出错:', error);
