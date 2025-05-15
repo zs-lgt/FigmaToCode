@@ -423,6 +423,9 @@ export class SVGNodeCreator extends BaseNodeCreator {
         return null;
       }
       
+      // 解析SVG中的fill属性
+      const fillColor = this.extractFillColor(data.svg);
+      
       // 使用Figma的createNodeFromSvg API创建SVG节点
       const svgNode = figma.createNodeFromSvg(data.svg);
       
@@ -432,6 +435,93 @@ export class SVGNodeCreator extends BaseNodeCreator {
       // 设置位置
       if (data.x !== undefined) svgNode.x = data.x;
       if (data.y !== undefined) svgNode.y = data.y;
+      
+      // 确保外层Frame是透明背景
+      if (svgNode.type === 'FRAME') {
+        // 设置外层Frame为透明背景
+        svgNode.fills = [];
+      }
+      
+      // 应用从SVG中提取的填充颜色
+      if (fillColor) {
+        try {
+          // 将RGBA颜色转换为Figma颜色格式
+          const { r, g, b, a } = fillColor;
+          const fillPaint: SolidPaint = {
+            type: 'SOLID',
+            color: { r, g, b },
+            opacity: a
+          };
+          
+          // 只对内部元素应用颜色，不要对外层Frame应用
+          if (svgNode.type !== 'FRAME') {
+            // 方法1：设置根节点的fills (只有当根节点不是Frame时才应用)
+            if ('fills' in svgNode) {
+              svgNode.fills = [fillPaint];
+            }
+          }
+          
+          // 方法2：递归设置所有子节点的fills
+          const applyFillsToChildren = (node: SceneNode) => {
+            // 只对Vector类型节点应用填充，跳过Frame
+            if (node.type === 'VECTOR' || node.type === 'BOOLEAN_OPERATION') {
+              if ('fills' in node) {
+                try {
+                  // 保留其他填充效果，只替换或添加纯色填充
+                  const existingFills = Array.isArray(node.fills) ? 
+                    [...node.fills as ReadonlyArray<Paint>] : 
+                    [];
+                  const nonSolidFills = existingFills.filter(fill => fill.type !== 'SOLID');
+                  
+                  node.fills = [...nonSolidFills, fillPaint];
+                } catch (e) {
+                  console.warn(`无法设置节点 ${node.name} 的fills:`, e);
+                }
+              }
+            }
+            
+            // 递归处理子节点
+            if ('children' in node) {
+              (node.children as SceneNode[]).forEach(child => applyFillsToChildren(child));
+            }
+          };
+          
+          // 遍历所有子节点
+          if ('children' in svgNode && svgNode.children.length > 0) {
+            applyFillsToChildren(svgNode);
+          }
+          
+          console.log(`应用SVG填充颜色: rgba(${r*255}, ${g*255}, ${b*255}, ${a})`);
+          console.log(`SVG节点层级结构: ${svgNode.name}, 子节点数: ${('children' in svgNode) ? svgNode.children.length : 0}`);
+          
+          // 方法3：直接操作内部Vector节点
+          try {
+            // 如果SVG导入后是帧结构，我们只对内部Vector元素应用填充
+            if (svgNode.type === 'FRAME' && svgNode.children.length > 0) {
+              // 查找所有Vector路径元素，并应用相同的填充色
+              svgNode.children.forEach(child => {
+                // 只对Vector节点应用填充色
+                if (child.type === 'VECTOR' && 'fills' in child) {
+                  try {
+                    child.fills = [fillPaint];
+                  } catch (e) {
+                    console.warn(`无法设置子节点 ${child.name} 的fills:`, e);
+                  }
+                }
+              });
+            }
+          } catch (e) {
+            console.warn('SVG子节点填充处理失败:', e);
+          }
+          
+          // 确保最后外层Frame一定是透明的（无论前面的操作如何）
+          if (svgNode.type === 'FRAME') {
+            svgNode.fills = [];
+          }
+        } catch (colorError) {
+          console.warn('应用SVG填充颜色时出错:', colorError);
+        }
+      }
       
       // 设置尺寸（如果有指定）
       if (data.width && data.height) {
@@ -495,6 +585,84 @@ export class SVGNodeCreator extends BaseNodeCreator {
         console.error('创建SVG占位节点也失败了:', fallbackError);
         return null;
       }
+    }
+  }
+  
+  // 提取SVG中的填充颜色
+  private extractFillColor(svgString: string): { r: number, g: number, b: number, a: number } | null {
+    try {
+      // 匹配 fill="rgba(R, G, B, A)" 或 fill="rgb(R, G, B)"
+      const rgbaMatch = svgString.match(/fill="rgba\(([^)]+)\)"/);
+      const rgbMatch = svgString.match(/fill="rgb\(([^)]+)\)"/);
+      
+      // 匹配16进制颜色 fill="#RRGGBB" 或 fill="#RGB"
+      const hexMatch = svgString.match(/fill="#([0-9a-fA-F]{3,6})"/);
+      
+      // 匹配命名颜色 fill="colorname"
+      const namedColorMatch = svgString.match(/fill="([a-zA-Z]+)"/);
+      
+      if (rgbaMatch) {
+        const values = rgbaMatch[1].split(',').map(val => parseFloat(val.trim()));
+        if (values.length >= 3) {
+          // 标准化RGB值为0-1范围
+          const r = values[0] / 255;
+          const g = values[1] / 255;
+          const b = values[2] / 255;
+          const a = values.length > 3 ? values[3] : 1; // 如果没有alpha值，默认为1
+          
+          return { r, g, b, a };
+        }
+      } else if (rgbMatch) {
+        const values = rgbMatch[1].split(',').map(val => parseFloat(val.trim()));
+        if (values.length >= 3) {
+          // 标准化RGB值为0-1范围
+          const r = values[0] / 255;
+          const g = values[1] / 255;
+          const b = values[2] / 255;
+          
+          return { r, g, b, a: 1 };
+        }
+      } else if (hexMatch) {
+        const hex = hexMatch[1];
+        let r, g, b;
+        
+        if (hex.length === 3) {
+          // 简写形式 #RGB
+          r = parseInt(hex[0] + hex[0], 16) / 255;
+          g = parseInt(hex[1] + hex[1], 16) / 255;
+          b = parseInt(hex[2] + hex[2], 16) / 255;
+        } else if (hex.length === 6) {
+          // 完整形式 #RRGGBB
+          r = parseInt(hex.substr(0, 2), 16) / 255;
+          g = parseInt(hex.substr(2, 2), 16) / 255;
+          b = parseInt(hex.substr(4, 2), 16) / 255;
+        } else {
+          return null;
+        }
+        
+        return { r, g, b, a: 1 };
+      } else if (namedColorMatch) {
+        // 简单处理一些常见的命名颜色
+        const colorName = namedColorMatch[1].toLowerCase();
+        switch (colorName) {
+          case 'black': return { r: 0, g: 0, b: 0, a: 1 };
+          case 'white': return { r: 1, g: 1, b: 1, a: 1 };
+          case 'red': return { r: 1, g: 0, b: 0, a: 1 };
+          case 'green': return { r: 0, g: 1, b: 0, a: 1 };
+          case 'blue': return { r: 0, g: 0, b: 1, a: 1 };
+          case 'yellow': return { r: 1, g: 1, b: 0, a: 1 };
+          case 'cyan': return { r: 0, g: 1, b: 1, a: 1 };
+          case 'magenta': return { r: 1, g: 0, b: 1, a: 1 };
+          case 'gray': return { r: 0.5, g: 0.5, b: 0.5, a: 1 };
+          case 'grey': return { r: 0.5, g: 0.5, b: 0.5, a: 1 };
+          default: return null;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('解析SVG填充颜色时出错:', error);
+      return null;
     }
   }
 }
