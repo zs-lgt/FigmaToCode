@@ -108,10 +108,8 @@ export const getNodeInfo = (node: SceneNode) => {
   // 约束属性
   if ('constraints' in node) nodeInfo.constraints = node.constraints;
 
-  // 变换属性
+  // 变换属性 - 只保留absoluteBoundingBox，移除其他几何属性以减小JSON数据大小
   if ('absoluteBoundingBox' in node) nodeInfo.absoluteBoundingBox = node.absoluteBoundingBox;
-  if ('absoluteRenderBounds' in node) nodeInfo.absoluteRenderBounds = node.absoluteRenderBounds;
-  if ('absoluteTransform' in node) nodeInfo.absoluteTransform = node.absoluteTransform;
 
   // 处理特定类型的节点属性
   if (node.type === 'FRAME' || node.type === 'GROUP' || node.type === 'INSTANCE') {
@@ -190,8 +188,7 @@ export const getNodeInfo = (node: SceneNode) => {
   if ('dashPattern' in node) nodeInfo.dashPattern = node.dashPattern;
   if ('fillStyleId' in node) nodeInfo.fillStyleId = node.fillStyleId;
   if ('strokeStyleId' in node) nodeInfo.strokeStyleId = node.strokeStyleId;
-  if ('fillGeometry' in node) nodeInfo.fillGeometry = node.fillGeometry;
-  if ('strokeGeometry' in node) nodeInfo.strokeGeometry = node.strokeGeometry;
+  // 移除fillGeometry和strokeGeometry属性以减小JSON数据大小
 
   // 圆角属性
   if ('cornerRadius' in node) nodeInfo.cornerRadius = node.cornerRadius;

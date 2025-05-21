@@ -1512,13 +1512,21 @@ export const PluginUI = (props: PluginUIProps) => {
               </div>
             )}
             
-            <textarea
-              value={propertyStatInput}
-              onChange={(e) => setPropertyStatInput(e.target.value)}
-              className="w-full h-32 p-2 border rounded-md mb-4 dark:bg-gray-700 dark:text-white"
-              placeholder="请输入您需要进行的属性分析和修改需求..."
-              disabled={isLoading}
-            />
+            <div className="relative w-full">
+              <textarea
+                value={propertyStatInput}
+                onChange={(e) => setPropertyStatInput(e.target.value)}
+                className="w-full h-32 p-2 border rounded-md mb-4 dark:bg-gray-700 dark:text-white"
+                placeholder=""
+                disabled={isLoading}
+              />
+              {!propertyStatInput && (
+                <div className="absolute top-2 left-2 text-gray-400 pointer-events-none">
+                  <p>属性统计：选中节点，保持修改意见为空，直接点击提交按钮即可</p>
+                  <p>属性修改：选中节点，填写修改意见，然后点击提交按钮即可批量修改属性</p>
+                </div>
+              )}
+            </div>
             
             {/* 添加进度条组件 */}
             <ImportProgress progress={importProgress} />

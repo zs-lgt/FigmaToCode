@@ -116,19 +116,6 @@ function traverseTree(node: SceneNode, callback: (node: any) => void) {
   }
 }
 
-// // 修改commentCollector函数
-// const commentCollector = (nodeId: string, node: SceneNode, data: any, nodesMap?: Map<string, { node: SceneNode, comment: string[] }>) => {
-//   if (data.comment) {
-//     console.log('data.comment', data.comment);
-//     if (nodesMap) {
-//       nodesMap.set(node.id, { 
-//         node, 
-//         comment: data.comment as string[] 
-//       });
-//     }
-//   }
-// };
-
 const standardMode = async () => {
   figma.showUI(__html__, { 
     width: 675, 
@@ -324,42 +311,12 @@ const standardMode = async () => {
       if (!data) {
         throw new Error('No data provided');
       }
-
-      // 创建一个变量来收集有comment的节点及其ID
-      const nodesWithComments = new Map<string, { node: SceneNode, comment: string[] }>();
-      
-      // 使用闭包创建一个收集器函数，将节点信息收集到nodesWithComments中
-      const collector = (nodeId: string, node: SceneNode, data: any) => {
-        commentCollector(nodeId, node, data, nodesWithComments);
-      };
-      
-      importFigmaJSON(data, collector).then(async () => {
-        // 如果有带comments的节点，则创建UX标注
-        if (nodesWithComments.size > 0) {
-            try {
-              // 准备UX信息数据
-              const uxInfoData: Record<string, string> = {};
-              
-              // 遍历带comments的节点
-              for (const [nodeId, { node, comment }] of nodesWithComments.entries()) {
-                // 直接将所有评论合并为一个字符串作为标注内容
-                uxInfoData[nodeId] = comment.join('\n\n');
-              }
-              // 创建并使用UX标注管理器
-              const textAnnotation = new TextAnnotation();
-              const uxManager = new TextAnnotationFactory(textAnnotation);
-              await uxManager.createAnnotation(uxInfoData);
-              figma.notify(`已为 ${nodesWithComments.size} 个节点创建UX标注`);
-            } catch (error: any) {
-              console.error('创建UX标注时出错:', error);
-              figma.notify(`创建UX标注失败: ${error.message}`, { error: true });
-            };
-        }
-        
+      console.log(123, data);
+      importFigmaJSON(data).then(async () => {
         // 发送成功消息
         figma.ui.postMessage({
           type: "success",
-          data: `Figma文件导入成功${nodesWithComments.size > 0 ? `，并为 ${nodesWithComments.size} 个节点创建了UX标注` : ''}`,
+          data: `Figma文件导入成功`,
         });
       }).catch((error) => {
         console.error('Error importing Figma JSON:', error);
@@ -879,12 +836,19 @@ const standardMode = async () => {
           
           if (data.status === 'success' && data.figma_json_list) {
             try {
-              // 记录原节点的位置和父节点
+              // 记录原节点的位置、父节点和在父节点中的索引位置
               const originalParent = selectedNode.parent;
               const originalBounds = {
                 x: selectedNode.x,
                 y: selectedNode.y
               };
+              
+              // 记录原节点在父节点中的索引位置
+              let originalIndex = -1;
+              if (originalParent && 'children' in originalParent) {
+                originalIndex = Array.from(originalParent.children).indexOf(selectedNode);
+                console.log(`原节点在父节点中的索引位置: ${originalIndex}`);
+              }
               
               // 获取原有的历史记录
               const existingHistoryArray = getHistoryData(selectedNode);
@@ -926,24 +890,43 @@ const standardMode = async () => {
                   const nodes = await importFigmaJSON(jsonData);
                   
                   if (nodes && nodes.length > 0) {
-                    // 将新节点添加到原节点的父节点
+                    // 将新节点添加到原节点的父节点，并保持原来的顺序
                     if (originalParent && 'appendChild' in originalParent) {
-                      // 如果导入过程中节点已经有了父节点，先移除
-                      nodes.forEach(node => {
-                        if (node.parent) {
+                      // 处理所有新节点
+                      nodes.forEach((node, nodeIndex) => {
+                        // 如果节点已有父节点，先从原父节点中移除
+                        if (node.parent && node.parent !== originalParent) {
                           node.parent.appendChild(node);
                         }
                         
-                        // 如果保留了原节点，新节点位置需要做相应调整
+                        // 设置节点位置
                         if (!shouldDeleteOrigin && i === 0) {
-                          // 第一个新节点放在原节点旁边
+                          // 如果保留原节点，第一个新节点放在原节点旁边
                           node.x = originalBounds.x + selectedNode.width + 20;
                           node.y = originalBounds.y;
                         } else {
-                          // 其他节点保持原来的位置规则
+                          // 如果删除原节点或非第一个新节点，使用原来的位置规则
                           node.x = originalBounds.x;
                           // 纵向排列，每个新节点比前一个低一些
                           node.y = originalBounds.y + i * (node.height + 20);
+                        }
+                        
+                        // 将节点添加到父节点
+                        originalParent.appendChild(node);
+                        
+                        // 如果有原始索引位置信息，将第一个节点放在原节点的位置
+                        if (originalIndex !== -1 && i === 0 && nodeIndex === 0) {
+                          // 如果原节点被删除，直接使用原始索引
+                          // 如果原节点保留，则插入到原节点后面的位置
+                          const insertIndex = shouldDeleteOrigin ? originalIndex : originalIndex + 1;
+                          
+                          // 尝试在指定位置插入节点
+                          try {
+                            originalParent.insertChild(insertIndex, node);
+                            console.log(`将新节点插入到索引位置: ${insertIndex}`);
+                          } catch (error) {
+                            console.warn(`插入节点到指定位置失败:`, error);
+                          }
                         }
                       });
                     }
