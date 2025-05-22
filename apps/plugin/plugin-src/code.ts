@@ -20,7 +20,7 @@ import { TextAnnotationFactory } from './ux/textAnnotationFactory';
 import { Edge, ConnectionFactory } from './ux/connectionFactory'
 
 let userPluginSettings: PluginSettings;
-let isCodeGenerationEnabled = true;  // 添加代码生成状态控制
+let isCodeGenerationEnabled = false;  // 默认关闭代码生成功能，避免插件打开时阻塞
 
 const defaultPluginSettings: PluginSettings = {
   framework: "HTML",
@@ -125,10 +125,10 @@ const standardMode = async () => {
   await initSettings();
 
   // 从本地存储获取代码生成状态
-  const savedCodeGenState = await figma.clientStorage.getAsync('codeGenerationEnabled');
-  if (savedCodeGenState !== undefined) {
-    isCodeGenerationEnabled = savedCodeGenState;
-  }
+  // 强制设置为关闭状态，即使用户之前保存了开启状态
+  isCodeGenerationEnabled = false;
+  // 将新的状态保存到本地存储
+  figma.clientStorage.setAsync('codeGenerationEnabled', false);
 
   // 初始化时发送状态到UI
   figma.ui.postMessage({
@@ -584,35 +584,96 @@ const standardMode = async () => {
                 // 调用API处理单个URL
                 const data = await callHtml2FigmaAPI(url);
                 
-                if (data.status === 'success' && data.figma_json) {
-                  // 解析JSON
-                  let importedNodes: SceneNode[] = [];
+                if (data.status === 'success') {
+                  // 创建一个数组来收集当前 URL 导入的节点
+                  let currentUrlNodes: SceneNode[] = [];
                   
-                  if (typeof data.figma_json === 'string') {
-                    const parsedJson = JSON.parse(data.figma_json);
-                    importedNodes = await importFigmaJSON(parsedJson);
-                  } else if (Array.isArray(data.figma_json)) {
-                    // 即使API返回数组，也依次导入每个元素
-                    for (const jsonItem of data.figma_json) {
-                      const parsedJson = typeof jsonItem === 'string' ? JSON.parse(jsonItem) : jsonItem;
-                      const nodes = await importFigmaJSON(parsedJson);
-                      importedNodes = [...importedNodes, ...nodes];
+                  // 处理 figma_json，如果存在
+                  if (data.figma_json) {
+                    // 解析JSON
+                    let importedNodes: SceneNode[] = [];
+                    
+                    if (typeof data.figma_json === 'string') {
+                      const parsedJson = JSON.parse(data.figma_json);
+                      importedNodes = await importFigmaJSON(parsedJson);
+                    } else if (Array.isArray(data.figma_json)) {
+                      // 即使API返回数组，也依次导入每个元素
+                      for (const jsonItem of data.figma_json) {
+                        const parsedJson = typeof jsonItem === 'string' ? JSON.parse(jsonItem) : jsonItem;
+                        const nodes = await importFigmaJSON(parsedJson);
+                        importedNodes = [...importedNodes, ...nodes];
+                      }
+                    } else {
+                      // 直接导入
+                      importedNodes = await importFigmaJSON(data.figma_json);
                     }
+                    
+                    // 记录当前 URL 导入的节点
+                    currentUrlNodes = [...currentUrlNodes, ...importedNodes];
+                    
+                    // 存储历史记录
+                    if (importedNodes.length > 0 && data.llmout) {
+                      const topLevelNode = importedNodes[0];
+                      storeHistoryData(topLevelNode, `HTML转换：${url}`, data.llmout);
+                    }
+                  }
+                  
+                  // 处理 analysis_json，如果存在
+                  if (data.analysis_json) {
+                    try {
+                      // 解析 analysis_json
+                      let analysisNodes: SceneNode[] = [];
+                      let analysisJsonData;
+                      
+                      if (typeof data.analysis_json === 'string') {
+                        analysisJsonData = JSON.parse(data.analysis_json);
+                      } else {
+                        analysisJsonData = data.analysis_json;
+                      }
+                      
+                      // 导入分析结果
+                      analysisNodes = await importFigmaJSON(analysisJsonData);
+                      
+                      // 如果有导入的节点，将分析结果放在页面的右侧
+                      if (analysisNodes && analysisNodes.length > 0) {
+                        // 如果已经导入了 figma_json 节点，将分析结果放在其右侧
+                        if (currentUrlNodes.length > 0) {
+                          const mainNode = currentUrlNodes[0];
+                          const rightMargin = 50; // 右侧间距
+                          
+                          // 计算主节点的右边界
+                          const mainNodeRight = mainNode.x + mainNode.width;
+                          
+                          // 将分析结果放在主节点的右侧
+                          analysisNodes.forEach(node => {
+                            node.x = mainNodeRight + rightMargin;
+                            // 保持y坐标与主节点一致
+                            node.y = mainNode.y;
+                          });
+                        }
+                        
+                        // 将分析节点添加到当前 URL 导入节点列表
+                        currentUrlNodes.push(...analysisNodes);
+                        
+                        // 添加标记，指示这是分析结果
+                        if (analysisNodes[0]) {
+                          analysisNodes[0].name = `分析结果: ${url}`;
+                        }
+                      }
+                    } catch (analysisError) {
+                      console.error(`导入URL ${url} 的分析结果失败:`, analysisError);
+                      // 分析结果导入失败不应该影响整体流程
+                    }
+                  }
+                  
+                  // 将当前 URL 的所有节点添加到总节点列表
+                  if (currentUrlNodes.length > 0) {
+                    allImportedNodes = [...allImportedNodes, ...currentUrlNodes];
+                    successCount++;
                   } else {
-                    // 直接导入
-                    importedNodes = await importFigmaJSON(data.figma_json);
+                    failureCount++;
+                    console.error(`URL导入失败: ${url}, 未能导入任何节点`);
                   }
-                  
-                  // 记录导入的节点
-                  allImportedNodes = [...allImportedNodes, ...importedNodes];
-                  
-                  // 存储历史记录
-                  if (importedNodes.length > 0 && data.llmout) {
-                    const topLevelNode = importedNodes[0];
-                    storeHistoryData(topLevelNode, `HTML转换：${url}`, data.llmout);
-                  }
-                  
-                  successCount++;
                 } else {
                   failureCount++;
                   console.error(`URL导入失败: ${url}, 状态: ${data.status || '未知错误'}`);
@@ -649,32 +710,100 @@ const standardMode = async () => {
             // 更新进度信息
             sendProgressInfo(0, 1, 0, 0, '正在导入组件...');
             
-            if (data.status === 'success' && data.figma_json) {
+            if (data.status === 'success') {
               try {
-                // 判断figma_json的类型
-                let importedNodes: SceneNode[] = [];
+                // 创建一个数组来收集所有导入的节点
+                let allImportedNodes: SceneNode[] = [];
                 
-                if (typeof data.figma_json === 'string') {
-                  // 如果是字符串，解析后直接导入
-                  const parsedJson = JSON.parse(data.figma_json);
-                  importedNodes = await importFigmaJSON(parsedJson);
-                } else {
-                  // 非字符串也非数组，尝试直接导入
-                  importedNodes = await importFigmaJSON(data.figma_json);
+                // 处理figma_json，如果存在
+                if (data.figma_json) {
+                  // 判断figma_json的类型
+                  let importedNodes: SceneNode[] = [];
+                  
+                  if (typeof data.figma_json === 'string') {
+                    // 如果是字符串，解析后直接导入
+                    const parsedJson = JSON.parse(data.figma_json);
+                    importedNodes = await importFigmaJSON(parsedJson);
+                  } else {
+                    // 非字符串，尝试直接导入
+                    importedNodes = await importFigmaJSON(data.figma_json);
+                  }
+                  
+                  // 收集导入的节点
+                  allImportedNodes.push(...importedNodes);
+                  
+                  // 将url和llmout作为一对数据存储到节点信息中
+                  if (importedNodes && importedNodes.length > 0 && data.llmout) {
+                    // 只在最外层节点上存储历史记录
+                    const topLevelNode = importedNodes[0];
+                    storeHistoryData(topLevelNode, `HTML转换：${url}`, data.llmout);
+                  }
+                }
+                
+                // 处理analysis_json，如果存在
+                if (data.analysis_json) {
+                  // 更新进度信息
+                  sendProgressInfo(0.7, 1, 0, 0, '正在导入分析结果...');
+                  
+                  let analysisNodes: SceneNode[] = [];
+                  let analysisJsonData;
+                  
+                  try {
+                    // 判断analysis_json的类型
+                    if (typeof data.analysis_json === 'string') {
+                      analysisJsonData = JSON.parse(data.analysis_json);
+                    } else {
+                      analysisJsonData = data.analysis_json;
+                    }
+                    
+                    // 导入分析结果
+                    analysisNodes = await importFigmaJSON(analysisJsonData);
+                    
+                    // 如果有导入的节点，将分析结果放在页面的右侧
+                    if (analysisNodes && analysisNodes.length > 0) {
+                      // 如果已经导入了figma_json节点，将分析结果放在其右侧
+                      if (allImportedNodes.length > 0) {
+                        const mainNode = allImportedNodes[0];
+                        const rightMargin = 50; // 右侧间距
+                        
+                        // 计算主节点的右边界
+                        const mainNodeRight = mainNode.x + mainNode.width;
+                        
+                        // 将分析结果放在主节点的右侧
+                        analysisNodes.forEach(node => {
+                          node.x = mainNodeRight + rightMargin;
+                          // 保持y坐标与主节点一致
+                          node.y = mainNode.y;
+                        });
+                      }
+                      
+                      // 将分析节点添加到导入节点列表
+                      allImportedNodes.push(...analysisNodes);
+                      
+                      // 添加标记，指示这是分析结果
+                      if (analysisNodes[0]) {
+                        analysisNodes[0].name = `分析结果: ${analysisNodes[0].name}`;
+                      }
+                    }
+                  } catch (analysisError) {
+                    console.error('导入分析结果失败:', analysisError);
+                    // 分析结果导入失败不应该影响整体流程
+                  }
                 }
                 
                 // 完成进度信息
                 sendProgressInfo(1, 1, 1, 0, '导入完成!');
                 
-                // 将url和llmout作为一对数据存储到节点信息中
-                if (importedNodes && importedNodes.length > 0 && data.llmout) {
-                  // 只在最外层节点上存储历史记录
-                  const topLevelNode = importedNodes[0];
-                  storeHistoryData(topLevelNode, `HTML转换：${url}`, data.llmout);
+                // 选中所有导入的节点
+                if (allImportedNodes.length > 0) {
+                  figma.currentPage.selection = allImportedNodes;
+                  figma.viewport.scrollAndZoomIntoView(allImportedNodes);
+                  
+                  // 发送成功消息
+                  sendResultMessage(true, "html2figma", data.llmout || `成功导入${allImportedNodes.length}个组件`);
+                } else {
+                  throw new Error('未能导入任何组件');
                 }
-                
-                // 发送成功消息
-                sendResultMessage(true, "html2figma", data.llmout || '组件生成成功');
               } catch (parseError) {
                 console.error('JSON解析或导入错误:', parseError);
                 // 完成进度信息（失败）
@@ -1176,7 +1305,17 @@ const callHtml2FigmaAPI = async (url: string, traceId: string = '123') => {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
 
-  return await response.json();
+  const result = await response.json();
+  
+  // 添加详细日志输出，便于诊断
+  console.log('HTML2Figma API响应详情:', {
+    status: result.status,
+    hasFigmaJson: !!result.figma_json,
+    hasAnalysisJson: !!result.analysis_json,
+    hasLlmout: !!result.llmout
+  });
+  
+  return result;
 };
 
 // 获取节点的最外层父节点（组件或实例）
