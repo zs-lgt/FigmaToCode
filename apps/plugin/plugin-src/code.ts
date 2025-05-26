@@ -849,14 +849,15 @@ const standardMode = async () => {
 
         // 如果uxCommentsMap有数据，则遍历uiData，将comments添加到node的comment属性中
         if (uxCommentsMap.size) {
-          console.log(1111)
-          traverseTree(uiData[0], (node) => {
-            const comments = uxCommentsMap.get(node.id);
-            if (comments) {
-              console.log('comments', comments);
-              node.comment = comments;
-            }
-          });
+          for (const uiDataChild of uiData) {
+            traverseTree(uiDataChild, (node) => {
+              const comments = uxCommentsMap.get(node.id);
+              if (comments) {
+                console.log('comments', comments);
+                node.comment = comments;
+              }
+            });
+          }
         }
         // 创建一个变量来收集有comment的节点及其ID
         const nodesWithComments = new Map<string, { node: SceneNode, comment: string[] }>();
