@@ -875,7 +875,9 @@ const standardMode = async () => {
         
         
         // 导入UI JSON
-        importFigmaJSON(uiData, collector).then(async (importedNodes) => {
+        importFigmaJSON(uiData, {
+          onProccess: collector
+        }).then(async (importedNodes) => {
           // 如果有带comments的节点，则创建UX标注
           if (nodesWithComments.size > 0) {
             try {

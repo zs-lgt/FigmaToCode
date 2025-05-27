@@ -1,27 +1,39 @@
 import { BaseAnnotation } from './base';
+import { importFigmaJSON} from 'backend/src/importFigma'
 
 const TEXT_PADDING_Y = 12;
 const TEXT_PADDING_X = 16;
 const TEXT_DEFAULT_SIZE = 14;
-const MIN_FRAME_HEIGHT = TEXT_DEFAULT_SIZE + TEXT_PADDING_Y * 2;
 const isBase64 = (str: string): boolean => {
   return /^data:image\/(png|jpeg|jpg|gif|svg|webp|svg\+xml);base64,/.test(str);
 }
 
+const isFigmaNode = (item: any): boolean => {
+  return typeof item === 'object' && item.type;
+}
 export class TextAnnotation extends BaseAnnotation {
-  public async createMultiContent(frame: FrameNode, content: string[]) {
+  private async createMultiContent(frame: FrameNode, content: string[]) {
     for(const item of content) {
-      console.log('item', item);
+
+      console.log('item', item)
       if (isBase64(item)) {
         // 其他图片格式直接处理
         await this.createImageNode(frame, item);
+      } else if (isFigmaNode(item)) {
+        //
+        const nodes = await importFigmaJSON(item)
+        if (nodes && nodes.length) {
+          for(const node of nodes) {
+            frame.appendChild(node)
+          }
+        }
       } else {
         await this.createTextNode(frame, item);
       }
     }
   }
 
-  public async createImageNode(frame: FrameNode, base64Data: string) {
+  private async createImageNode(frame: FrameNode, base64Data: string) {
     try {
       // Remove the data URL prefix to get the base64 string
       const base64String = base64Data.split(',')[1];
@@ -53,7 +65,7 @@ export class TextAnnotation extends BaseAnnotation {
     }
   }
 
-  public async createTextNode(frame: FrameNode, text: string) {
+  private async createTextNode(frame: FrameNode, text: string) {
     const textNode = figma.createText();
     textNode.name = "标注文本";
     textNode.fontSize = 14;
@@ -137,117 +149,88 @@ export class TextAnnotation extends BaseAnnotation {
              bounds2.y + bounds2.height < bounds1.y);
   }
 
-  public async create(node: SceneNode, text: string | string[] = "请输入交互描述..."): Promise<void> {
-    try {
-      // 增加计数器
-      this.state.annotationCounter++;
+  private createTextContent(frame: FrameNode, text: string) {
+    const textNode = figma.createText();
+    textNode.name = "标注文本";
+    textNode.fontSize = 14;
+    textNode.fills = [{ type: "SOLID", color: { r: 0.2, g: 0.2, b: 0.2 } }];
+    textNode.characters = text;
 
-      // 创建源标注
-      const sourceNumber = await this.createSourceAnnotation(node, this.state.annotationCounter);
+    // 设置文本节点大小和行为
+    textNode.textAutoResize = "HEIGHT";
+    textNode.resize(400 - 32, textNode.fontSize + 8);
+    textNode.textAlignVertical = "TOP";
+    textNode.textAlignHorizontal = "LEFT";
+    // 设置文本高度为自适应高度
+    textNode.textAutoResize = "HEIGHT";
 
-      // 创建一个 frame 作为输入框容器
-      const frame = figma.createFrame();
-      frame.name = "标注框";
-      frame.fills = [{ type: "SOLID", color: { r: 0.98, g: 0.98, b: 0.98 } }];
-      frame.strokes = [{ type: "SOLID", color: { r: 0.91, g: 0.91, b: 0.91 } }];
-      frame.strokeWeight = 1;
-      frame.cornerRadius = 4;
-      frame.clipsContent = false;
-      frame.layoutMode = "VERTICAL";
-      frame.primaryAxisSizingMode = "AUTO";
-      frame.counterAxisSizingMode = "AUTO";
-      frame.counterAxisAlignItems = "MIN";
-      frame.primaryAxisAlignItems = "MIN";
-      frame.layoutSizingVertical = "HUG";
-      frame.itemSpacing = 8;
-      frame.paddingLeft = TEXT_PADDING_X;
-      frame.paddingRight = TEXT_PADDING_X;
-      frame.paddingTop = TEXT_PADDING_Y;
-      frame.paddingBottom = TEXT_PADDING_Y;
+    // 将文本添加到 frame 中
+    frame.appendChild(textNode);
+  }
 
+  private createContentContainer() {
+    // 创建一个 frame 作为输入框容器
+    const frame = figma.createFrame();
+    frame.name = "标注框";
+    frame.fills = [{ type: "SOLID", color: { r: 0.98, g: 0.98, b: 0.98 } }];
+    frame.strokes = [{ type: "SOLID", color: { r: 0.91, g: 0.91, b: 0.91 } }];
+    frame.strokeWeight = 1;
+    frame.cornerRadius = 4;
+    frame.clipsContent = false;
+    frame.layoutMode = "VERTICAL";
+    frame.primaryAxisSizingMode = "AUTO";
+    frame.counterAxisSizingMode = "AUTO";
+    frame.counterAxisAlignItems = "MIN";
+    frame.primaryAxisAlignItems = "MIN";
+    frame.layoutSizingVertical = "HUG";
+    frame.itemSpacing = 8;
+    frame.paddingLeft = TEXT_PADDING_X;
+    frame.paddingRight = TEXT_PADDING_X;
+    frame.paddingTop = TEXT_PADDING_Y;
+    frame.paddingBottom = TEXT_PADDING_Y;
+    return frame
+  }
+    
 
-      if (typeof text === 'object' && text.length) {
-        await this.createMultiContent(frame, text)
-      } else {
-        // 创建文本节点
-        const textNode = figma.createText();
-        textNode.name = "标注文本";
-        textNode.fontSize = 14;
-        textNode.fills = [{ type: "SOLID", color: { r: 0.2, g: 0.2, b: 0.2 } }];
-        textNode.characters = typeof text === 'string' ? text : text.join('\n');
+  // 创建目标标记的数字
+  private createTargetNumber(name: string, number: number) {
+    const targetNumber = figma.createText();
+    targetNumber.name = name;
+    targetNumber.fontSize = 14;
+    targetNumber.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
+    targetNumber.characters = number.toString();
+    targetNumber.textAlignHorizontal = "CENTER";
+    targetNumber.textAlignVertical = "CENTER";
+    targetNumber.x = (24 - targetNumber.width) / 2;
+    targetNumber.y = (24 - targetNumber.height) / 2;
+    return targetNumber;
+  }
 
-        // 设置文本节点大小和行为
-        textNode.textAutoResize = "HEIGHT";
-        textNode.resize(400 - 32, textNode.fontSize + 8);
-        textNode.textAlignVertical = "TOP";
-        textNode.textAlignHorizontal = "LEFT";
-        // 设置文本高度为自适应高度
-        textNode.textAutoResize = "HEIGHT";
+  // 创建标注框的圆形标记
+  private createTargetLabel(name: string) {
+    const targetLabel = figma.createFrame();
+    targetLabel.name = name;
+    targetLabel.resize(24, 24);
+    targetLabel.cornerRadius = 12;
+    targetLabel.fills = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
+    targetLabel.effects = [
+      {
+        type: "DROP_SHADOW",
+        color: { r: 1, g: 1, b: 1, a: 1 },
+        offset: { x: 0, y: 0 },
+        radius: 4,
+        spread: 2,
+        visible: true,
+        blendMode: "NORMAL",
+      },
+    ];
+    return targetLabel;
+  }
 
-        // 将文本添加到 frame 中
-        frame.appendChild(textNode);
-      }
-
-      // 创建标注框的圆形标记
-      const targetNumber = figma.createFrame();
-      targetNumber.name = "目标标记";
-      targetNumber.resize(24, 24);
-      targetNumber.cornerRadius = 12;
-      targetNumber.fills = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
-      targetNumber.effects = [
-        {
-          type: "DROP_SHADOW",
-          color: { r: 1, g: 1, b: 1, a: 1 },
-          offset: { x: 0, y: 0 },
-          radius: 4,
-          spread: 2,
-          visible: true,
-          blendMode: "NORMAL",
-        },
-      ];
-
-      // 创建目标标记的数字
-      const targetLabel = figma.createText();
-      targetLabel.name = "目标标记数字";
-      targetLabel.fontSize = 14;
-      targetLabel.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 } }];
-      targetLabel.characters = this.state.annotationCounter.toString();
-      targetLabel.textAlignHorizontal = "CENTER";
-      targetLabel.textAlignVertical = "CENTER";
-      targetLabel.x = (24 - targetLabel.width) / 2;
-      targetLabel.y = (24 - targetLabel.height) / 2;
-
-      targetNumber.appendChild(targetLabel);
-
-      // 添加阴影效果
-      // frame.effects = [
-      //   {
-      //     type: "DROP_SHADOW",
-      //     color: { r: 0, g: 0, b: 0, a: 0.25 },
-      //     offset: { x: 0, y: 4 },
-      //     radius: 8,
-      //     spread: 0,
-      //     visible: true,
-      //     blendMode: "NORMAL",
-      //   },
-      // ];
-
-      // 设置插件数据
-      frame.setPluginData("type", "annotation-frame");
-      // textNode.setPluginData("type", "annotation-text");
-      sourceNumber.setPluginData("type", "annotation-number");
-      targetNumber.setPluginData("type", "annotation-number");
-      frame.setPluginData("annotation-number", this.state.annotationCounter.toString());
-
-      // 设置初始尺寸和位置
-      // frame.resize(400, 400);
-      frame.x = 30;
-      frame.y = 0;
-
-      // 设置标注框标记的位置
-      targetNumber.x = 0;
-      targetNumber.y = 0;
-
+  /**
+   * 创建标注框的容器
+   */
+  createAnnotationContainer(node: SceneNode) {
       // 创建一个frame来包含标注框和其标记
       const annotationContainer = figma.createFrame();
       annotationContainer.name = `标注组-${this.state.annotationCounter}/${node.name}/${node.id}`;
@@ -260,10 +243,52 @@ export class TextAnnotation extends BaseAnnotation {
       annotationContainer.itemSpacing = 8;
       
       annotationContainer.clipsContent = false;
+      return annotationContainer;
+  }
+    
+  
+  public async create(node: SceneNode, text: string | string[] = "请输入交互描述..."): Promise<void> {
+    try {
+      // 增加计数器
+      this.state.annotationCounter++;
+
+      // 创建源标注
+      const sourceNumber = await this.createSourceAnnotation(node, this.state.annotationCounter);
+
+      // 创建一个 frame 作为输入框容器
+      const contentContainer = this.createContentContainer()
+
+      if (typeof text === 'object' && text.length) {
+        await this.createMultiContent(contentContainer, text)
+      } else {
+        // 拼接文本，创建文本节点
+        this.createTextContent(contentContainer, typeof text === 'string' ? text : text.join('\n'));
+      }
+
+      // 创建标注框的圆形标记
+      const targetLabel = this.createTargetLabel('目标标记');
+
+
+      // 创建目标标记的数字
+      const targetNumber = this.createTargetNumber('目标标记数字', this.state.annotationCounter);
+
+      targetLabel.appendChild(targetNumber);
+
+
+      // 设置初始尺寸和位置
+      contentContainer.x = 30;
+      contentContainer.y = 0;
+
+      // 设置标注框标记的位置
+      targetLabel.x = 0;
+      targetLabel.y = 0;
+
+      // 创建一个frame来包含标注框和其标记
+      const annotationContainer = this.createAnnotationContainer(node);
       
       // 将标注框和标记添加到frame中
-      annotationContainer.appendChild(targetNumber);
-      annotationContainer.appendChild(frame);
+      annotationContainer.appendChild(targetLabel);
+      annotationContainer.appendChild(contentContainer);
 
       // 获取节点的位置和大小
       const bounds = node.absoluteBoundingBox;
@@ -290,6 +315,13 @@ export class TextAnnotation extends BaseAnnotation {
       const sourceGroup = figma.group([sourceNumber], figma.currentPage);
       sourceGroup.name = `源标注组-${this.state.annotationCounter}/${node.name}/${node.id}`;
 
+      // 设置插件数据
+      contentContainer.setPluginData("type", "annotation-frame");
+      // textNode.setPluginData("type", "annotation-text");
+      sourceNumber.setPluginData("type", "annotation-number");
+      targetNumber.setPluginData("type", "annotation-number");
+      contentContainer.setPluginData("annotation-number", this.state.annotationCounter.toString());
+
       // 保存原始节点的引用
       sourceGroup.setPluginData("source-node-id", node.id);
       this.state.setSourceMarker(sourceGroup.id, node.id);
@@ -302,53 +334,6 @@ export class TextAnnotation extends BaseAnnotation {
       this.state.registerTextAnnotation(annotationContainer, sourceGroup);
       // 刷新缓存
       this.state.invalidateCache();
-
-      // 监听文本变化以调整高度
-      // const documentChangeHandler = this.eventManager.debounce((event: DocumentChangeEvent) => {
-      //   if (this.eventManager.isLocalEvent(event)) return;
-      //   const changes = event.documentChanges;
-
-      //   // 处理文本变化
-      //   const hasTextChange = changes.some(
-      //     (change) =>
-      //       change.type === "PROPERTY_CHANGE" &&
-      //       change.node.id === textNode.id &&
-      //       change.properties.includes("characters")
-      //   );
-
-      //   if (hasTextChange) {
-      //     // 强制重新计算布局
-      //     frame.layoutMode = "HORIZONTAL";
-      //     frame.layoutMode = "VERTICAL";
-
-      //     // 确保最小高度
-      //     const contentHeight = textNode.height + 32; // 文本高度 + padding
-      //     const newHeight = Math.max(400, contentHeight);
-
-      //     // 如果高度需要调整，则调整
-      //     if (frame.height !== newHeight) {
-      //       frame.resize(400, newHeight);
-      //       annotationGroup.resize(430, newHeight);
-      //     }
-      //   }
-      // }, 100);
-
-      // figma.on("documentchange", documentChangeHandler);
-
-      // // 监听选择变化
-      // const selectionChangeHandler = () => {
-      //   const selection = figma.currentPage.selection;
-      //   if (selection.length === 0 || !selection.includes(frame)) {
-      //     if (textNode.characters === "") {
-      //       textNode.characters = "请输入交互描述...";
-      //     }
-      //     // 只移除文本相关的事件监听器
-      //     figma.off("documentchange", documentChangeHandler);
-      //     figma.off("selectionchange", selectionChangeHandler);
-      //   }
-      // };
-
-      // figma.on("selectionchange", selectionChangeHandler);
 
       // // 保存计数器状态
       figma.clientStorage.setAsync("annotationCounter", this.state.annotationCounter);

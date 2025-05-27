@@ -12,8 +12,11 @@ interface ComponentPropertyDefinition {
   }>;
 }
 
-interface ComponentPropertyDefinitions {
-  [key: string]: ComponentPropertyDefinition;
+
+interface ImportConfig {
+  onImportOver?: (importedNodes: SceneNode[]) => void;
+  onImportStart?: (importedNodes: SceneNode[]) => void;
+  onProccess?: (nodeId: string, node: SceneNode, nodeData: any) => void
 }
 
 // 新增：字体映射表，用于替换找不到的字体
@@ -180,6 +183,20 @@ function canSetLayoutSizing(node: SceneNode): boolean {
   return false;
 }
 
+const DEFAULT_IMPORT_CONFIG = {
+  onImportOver: (importedNodes: SceneNode[]) => {
+    // Select the imported content
+    if (importedNodes.length > 0) {
+      figma.currentPage.selection = importedNodes;
+      figma.viewport.scrollAndZoomIntoView(importedNodes);
+      figma.notify(`成功导入 ${importedNodes.length} 个节点`, { timeout: 2000 });
+    }
+  },
+  onImportStart: (importedNodes: SceneNode[]) => {
+    figma.notify('开始导入JSON数据...', { timeout: 1000 });
+  },
+  onProccess: () => {}
+}
 // Main function to import nodes - 优化版本
 export async function importNode(
   data: any, 
@@ -270,118 +287,7 @@ export async function importNode(
           const factory = new NodeFactory();
           node = await factory.createNode(nodeData.type, nodeData);
         }
-      } 
-      // todo：临时注释掉克隆方案，本地已有组件再导入没有意义，后面探索凭空导入团队库组件的方案
-      // // 处理COMPONENT_SET节点 - 通过componentKey导入
-      // else if (nodeData.type === 'COMPONENT_SET' && nodeData.componentKey) {
-      //   console.log(2);
-        
-      //   // 直接尝试在本地查找组件集
-      //   try {
-      //     // 确保所有页面都已加载
-      //     await figma.loadAllPagesAsync();
-          
-      //     // 查找所有组件集
-      //     const componentSets = figma.root.findAllWithCriteria({
-      //       types: ["COMPONENT_SET"],
-      //     });
-          
-      //     // 根据componentKey查找匹配的组件集
-      //     const localComponentSet = componentSets.find(cs => cs.key === nodeData.componentKey);
-          
-      //     if (localComponentSet) {
-      //       // 使用找到的组件集
-      //       node = localComponentSet.clone();
-      //       console.log(`找到本地组件集: ${localComponentSet.name}`);
-            
-      //       // 保持原有的位置属性
-      //       if (nodeData.x !== undefined) node.x = nodeData.x;
-      //       if (nodeData.y !== undefined) node.y = nodeData.y;
-            
-      //       // 设置组件属性
-      //       if (nodeData.componentPropertyDefinitions) {
-      //         await setComponentProperties(
-      //           node as ComponentNode | ComponentSetNode,
-      //           nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
-      //         );
-      //       }
-      //     } else {
-      //       console.warn(`未找到匹配的本地组件集，componentKey: ${nodeData.componentKey}`);
-      //     }
-      //   } catch (localError) {
-      //     console.error('本地组件集查找失败:', localError);
-      //   }
-        
-      //   // 如果本地查找失败，使用常规方法创建节点
-      //   if (!node) {
-      //     const factory = new NodeFactory();
-      //     node = await factory.createNode(nodeData.type, nodeData);
-          
-      //     // 使用通用方法设置组件属性
-      //     if (node && nodeData.componentPropertyDefinitions && 
-      //         (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET')) {
-      //       await setComponentProperties(
-      //         node as ComponentNode | ComponentSetNode,
-      //         nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
-      //       );
-      //     }
-      //   }
-      // }
-      // // 处理COMPONENT节点 - 通过componentKey导入
-      // else if (nodeData.type === 'COMPONENT' && nodeData.componentKey) {
-      //   console.log(3);
-        
-      //   // 直接尝试在本地查找组件
-      //   try {
-      //     // 确保所有页面都已加载
-      //     await figma.loadAllPagesAsync();
-      //     // 查找所有组件
-      //     const components = figma.root.findAllWithCriteria({
-      //       types: ["COMPONENT"],
-      //     });
-
-      //     // 根据componentKey查找匹配的组件
-      //     const localComponent = components.find(c => c.key === nodeData.componentKey);
-      //     if (localComponent) {
-      //       // 使用找到的组件
-      //       node = localComponent.clone();
-      //       console.log(`找到并克隆本地组件: ${localComponent.name}`);
-            
-      //       // 保持原有的位置属性
-      //       if (nodeData.x !== undefined) node.x = nodeData.x;
-      //       if (nodeData.y !== undefined) node.y = nodeData.y;
-            
-      //       // 设置组件属性
-      //       if (nodeData.componentPropertyDefinitions) {
-      //         await setComponentProperties(
-      //           node as ComponentNode | ComponentSetNode,
-      //           nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
-      //         );
-      //       }
-      //     } else {
-      //       console.warn(`未找到匹配的本地组件，componentKey: ${nodeData.componentKey}`);
-      //     }
-      //   } catch (localError) {
-      //     console.error('本地组件查找失败:', localError);
-      //   }
-        
-      //   // 如果本地查找失败，使用常规方法创建节点
-      //   if (!node) {
-          
-      //     const factory = new NodeFactory();
-      //     node = await factory.createNode(nodeData.type, nodeData);
-          
-      //     // 使用通用方法设置组件属性
-      //     if (node && nodeData.componentPropertyDefinitions && 
-      //         (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET')) {
-      //       await setComponentProperties(
-      //         node as ComponentNode | ComponentSetNode,
-      //         nodeData.componentPropertyDefinitions as ComponentPropertyDefinitions
-      //       );
-      //     }
-      //   }
-      // }
-      else {
+      } else {
         // 其他类型节点使用原来的逻辑
         const factory = new NodeFactory();
         node = await factory.createNode(nodeData.type, nodeData);
@@ -612,13 +518,13 @@ export async function importNode(
 
 // Entry point for importing Figma JSON
 export async function importFigmaJSON(
-  jsonData: any, 
-  callback?: (nodeId: string, node: SceneNode, nodeData: any) => void
+  jsonData: any,
+  config?: ImportConfig
 ): Promise<SceneNode[]> {
   try {
-    // 性能优化：添加进度反馈
-    figma.notify('开始导入JSON数据...', { timeout: 1000 });
-    
+    const { onImportOver, onImportStart, onProccess } = Object.assign({}, DEFAULT_IMPORT_CONFIG, config);
+
+    onImportStart && onImportStart?.(jsonData);
     // 性能优化：预加载所有字体
     await preloadFonts(jsonData);
     
@@ -694,7 +600,7 @@ export async function importFigmaJSON(
       
       // 并行处理一批节点
       const batchPromises = batch.map(async(nodeData) => 
-        await importNode(nodeData, figma.currentPage, { x: minX, y: minY }, callback)
+        await importNode(nodeData, figma.currentPage, { x: minX, y: minY }, onProccess)
       );
       
       const batchResults = await Promise.all(batchPromises);
@@ -707,57 +613,12 @@ export async function importFigmaJSON(
       }
     }
 
-    // Select the imported content
-    if (importedNodes.length > 0) {
-      figma.currentPage.selection = importedNodes;
-      figma.viewport.scrollAndZoomIntoView(importedNodes);
-      figma.notify(`成功导入 ${importedNodes.length} 个节点`, { timeout: 2000 });
-    }
-    
+    onImportOver && onImportOver?.(importedNodes);
     // 返回导入的节点数组
     return importedNodes;
   } catch (error: any) {
     console.error('Error importing Figma JSON:', error);
     figma.notify(`导入失败: ${error.message}`, { error: true });
     throw error;
-  }
-}
-
-// 新增：设置组件属性的通用方法
-async function setComponentProperties(
-  node: ComponentNode | ComponentSetNode,
-  propertyDefinitions: ComponentPropertyDefinitions
-): Promise<void> {
-  try {
-    for (const [propertyName, propertyDef] of Object.entries(propertyDefinitions)) {
-      try {
-        // 根据不同的属性类型处理
-        switch(propertyDef.type) {
-          case 'BOOLEAN':
-          case 'TEXT':
-          case 'INSTANCE_SWAP':
-            console.log(123, propertyName);
-            
-            node.editComponentProperty(propertyName, {
-              defaultValue: propertyDef.defaultValue,
-            });
-            break;
-          case 'VARIANT':
-            // VARIANT 类型只支持修改 name
-            node.editComponentProperty(propertyName, {
-              name: propertyDef.name,
-              defaultValue: undefined,
-              preferredValues: []
-            });
-            break;
-          default:
-            console.warn(`不支持的组件属性类型: ${propertyDef.type}`);
-        }
-      } catch (propError) {
-        console.warn(`设置组件属性 ${propertyName} 失败:`, propError);
-      }
-    }
-  } catch (error) {
-    console.warn('设置组件属性定义失败:', error);
   }
 }

@@ -15,8 +15,10 @@ export class TextNodeCreator extends BaseNodeCreator {
     
     try {
       // 3. 写入文本（现在可以安全地写入，因为字体已在预加载阶段加载）
-      if (data.characters) {
+      if (data?.characters) {
         node.characters = data.characters;
+      } else {
+        node.characters = '';
       }
       
       // 4. 导入文本样式
