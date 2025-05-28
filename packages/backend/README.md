@@ -1,17 +1,17 @@
-# @thsf2e/figma-create-backend
+# @thsf2e/create-x
 
 A powerful backend library for converting Figma designs to code, supporting multiple frameworks including React, Vue, Flutter, and SwiftUI.
 
 ## Installation
 
 ```bash
-npm install @thsf2e/figma-create-backend
+npm install @thsf2e/create-x
 ```
 
 or
 
 ```bash
-yarn add @thsf2e/figma-create-backend
+yarn add @thsf2e/create-x
 ```
 
 ## Features
@@ -28,7 +28,7 @@ yarn add @thsf2e/figma-create-backend
 ### Exporting Nodes
 
 ```typescript
-import { exportNodes } from '@thsf2e/figma-create-backend';
+import { exportNodes } from '@thsf2e/create-x';
 
 // Export nodes with optimization
 const result = await exportNodes(figma.currentPage.children, true);
@@ -43,7 +43,7 @@ const result = await exportNodes(figma.currentPage.children, true);
 ### Importing JSON
 
 ```typescript
-import { importFigmaJSON } from '@thsf2e/figma-create-backend';
+import { importFigmaJSON } from '@thsf2e/create-x';
 
 // Import JSON data into Figma
 await importFigmaJSON(jsonData);
@@ -52,7 +52,7 @@ await importFigmaJSON(jsonData);
 ### Working with Individual Nodes
 
 ```typescript
-import { getNodeInfo, cleanExportData } from '@thsf2e/figma-create-backend';
+import { getNodeInfo, cleanExportData } from '@thsf2e/create-x';
 
 // Get information about a specific node
 const nodeInfo = getNodeInfo(someNode);

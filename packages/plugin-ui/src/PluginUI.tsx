@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { coldarkDark as theme } from "react-syntax-highlighter/dist/esm/styles/prism";
 import copy from "copy-to-clipboard"
-import classNames from "classnames";;
+import classNames from "classnames";
+import CrawlWebModal from "./CrawlWebModal";
 
 export type FrameworkTypes = "HTML" | "Tailwind" | "Flutter" | "SwiftUI";
 
@@ -139,6 +140,7 @@ export const PluginUI = (props: PluginUIProps) => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showHtml2FigmaModal, setShowHtml2FigmaModal] = useState(false);
   const [html2figmaInput, setHtml2figmaInput] = useState('');
+  const [showCrawlWebModal, setShowCrawlWebModal] = useState(false);
   const [showUiUxModal, setShowUiUxModal] = useState(false);
   const [uiJsonFile, setUiJsonFile] = useState<File | null>(null);
   const [uxJsonFile, setUxJsonFile] = useState<File | null>(null);
@@ -537,6 +539,10 @@ export const PluginUI = (props: PluginUIProps) => {
     setShowHtml2FigmaModal(true);
   };
 
+  const handleCrawlWebClick = () => {
+    setShowCrawlWebModal(true);
+  };
+
   // 修改handleHtml2FigmaSubmit函数
   const handleHtml2FigmaSubmit = () => {
     try {
@@ -873,6 +879,12 @@ export const PluginUI = (props: PluginUIProps) => {
               className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               导入UX
+            </button>
+            <button
+              onClick={handleCrawlWebClick}
+              className="flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-2"
+            >
+              网页抓取
             </button>
             <button
               onClick={handleHtml2FigmaClick}
@@ -1288,6 +1300,12 @@ export const PluginUI = (props: PluginUIProps) => {
         </div>
       )}
       
+      {/* 网页抓取模态框 */}
+      <CrawlWebModal 
+        isOpen={showCrawlWebModal}
+        onClose={() => setShowCrawlWebModal(false)}
+      />
+
       {/* HTML2Figma Modal */}
       {showHtml2FigmaModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>

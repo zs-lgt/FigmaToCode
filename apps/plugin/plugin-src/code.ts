@@ -17,7 +17,8 @@ import { importFigmaJSON } from 'backend/src/importFigma';
 import { TextAnnotation } from './ux/annotations/text';
 import { Connection } from './ux/connections/connection'
 import { TextAnnotationFactory } from './ux/textAnnotationFactory';
-import { Edge, ConnectionFactory } from './ux/connectionFactory'
+import { Edge, ConnectionFactory } from './ux/connectionFactory';
+import { crawlHtml, getCrawlTaskStatus, getCrawlTaskResult } from './share/crawl';
 
 let userPluginSettings: PluginSettings;
 let isCodeGenerationEnabled = false;  // 默认关闭代码生成功能，避免插件打开时阻塞
@@ -544,6 +545,89 @@ const standardMode = async () => {
           }
         });
       });
+    } else if (msg.type === 'crawl-html') {
+      // 处理网页抓取请求
+      (async () => {
+        try {
+          if (!msg.url) {
+            throw new Error('没有提供网页URL');
+          }
+          
+          // 调用抓取网页API
+          const taskId = await crawlHtml(msg.url);
+          
+          // 发送成功消息
+          figma.ui.postMessage({
+            type: 'crawl-html-response',
+            success: true,
+            taskId: taskId
+          });
+        } catch (error: any) {
+          console.error('抓取网页失败:', error);
+          // 发送错误消息
+          figma.ui.postMessage({
+            type: 'crawl-html-response',
+            success: false,
+            error: error.message || String(error)
+          });
+        }
+      })();
+    } else if (msg.type === 'get-crawl-task-status') {
+      // 处理查询抓取任务状态请求
+      (async () => {
+        try {
+          if (!msg.taskId) {
+            throw new Error('没有提供任务ID');
+          }
+          
+          // 调用查询任务状态API
+          const status = await getCrawlTaskStatus(msg.taskId);
+          console.log('查询任务状态:', status);
+          if (!status) return;
+          // 发送成功消息
+          figma.ui.postMessage({
+            type: 'crawl-task-status-response',
+            success: true,
+            status: status,
+            taskId: msg.taskId
+          });
+        } catch (error: any) {
+          console.error('查询任务状态失败:', error);
+          // 发送错误消息
+          figma.ui.postMessage({
+            type: 'crawl-task-status-response',
+            success: false,
+            error: error.message || String(error)
+          });
+        }
+      })();
+    } else if (msg.type === 'get-crawl-task-result') {
+      // 处理获取抓取任务结果请求
+      (async () => {
+        try {
+          if (!msg.taskId) {
+            throw new Error('没有提供任务ID');
+          }
+          
+          // 调用获取任务结果 API
+          const result = await getCrawlTaskResult(msg.taskId);
+          
+          // 发送成功消息
+          figma.ui.postMessage({
+            type: 'crawl-task-result-response',
+            success: true,
+            result: result
+          });
+        } catch (error: any) {
+          console.error('获取任务结果失败:', error);
+          // 发送错误消息
+          figma.ui.postMessage({
+            type: 'crawl-task-result-response',
+            success: false,
+            error: error.message || String(error)
+          });
+        }
+      })();
     } else if (msg.type === 'html2figma-generate') {
       (async () => {
         try {
