@@ -69,7 +69,6 @@ export const getCrawlTaskResult = async (task_id: string) => {
         }
       }
     }
-
     return result;
   } catch (error: any) {
     // 处理解析错误

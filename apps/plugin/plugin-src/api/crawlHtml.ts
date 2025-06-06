@@ -17,6 +17,7 @@ interface getCrawlTaskStatusResponse {
 }
 
 const CRAWL_API_BASE_URL = 'https://occ.10jqka.com.cn/process_image';
+const DEFAULT_TIMEOUT = 100000;
 
 /**
  * 提交爬取任务
@@ -36,7 +37,7 @@ export const startCrawlTaskApi = async (url: string): Promise<proccessCrawlTaskR
       'Content-Type': `multipart/form-data; boundary=${boundary}`
     },
     body: formDataBody
-  }, 10000);
+  }, DEFAULT_TIMEOUT);
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
@@ -55,7 +56,7 @@ export const getCrawlTaskStatusApi = async (task_id: string): Promise<getCrawlTa
   const response = await fxios(`${API_BASE_URL}`, {
     method: 'GET',
     headers: {},
-  }, 10000);
+  }, DEFAULT_TIMEOUT);
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
@@ -74,7 +75,7 @@ export const getCrawlTaskResultApi = async (task_id: string): Promise<ArrayBuffe
   const API_BASE_URL = `${CRAWL_API_BASE_URL}/download-result/${task_id}`;
   const response = await fxios(`${API_BASE_URL}`, {
     method: 'GET',
-  }, 10000);
+  }, DEFAULT_TIMEOUT);
 
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
