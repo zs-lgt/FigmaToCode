@@ -1,9 +1,16 @@
 import { BaseAnnotation } from './base';
 import { importFigmaJSON} from 'backend/src/importFigma'
 
+interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 const TEXT_PADDING_Y = 12;
 const TEXT_PADDING_X = 16;
-const TEXT_DEFAULT_SIZE = 14;
+
 const isBase64 = (str: string): boolean => {
   return /^data:image\/(png|jpeg|jpg|gif|svg|webp|svg\+xml);base64,/.test(str);
 }
@@ -11,16 +18,14 @@ const isBase64 = (str: string): boolean => {
 const isFigmaNode = (item: any): boolean => {
   return typeof item === 'object' && item.type;
 }
+
 export class TextAnnotation extends BaseAnnotation {
   private async createMultiContent(frame: FrameNode, content: string[]) {
     for(const item of content) {
-
-      console.log('item', item)
       if (isBase64(item)) {
         // 其他图片格式直接处理
         await this.createImageNode(frame, item);
       } else if (isFigmaNode(item)) {
-        //
         const nodes = await importFigmaJSON(item)
         if (nodes && nodes.length) {
           for(const node of nodes) {
@@ -246,8 +251,25 @@ export class TextAnnotation extends BaseAnnotation {
       return annotationContainer;
   }
     
+  private getContainerBounds(
+    node: SceneNode,
+    rootBounds: Bounds,
+    bounds?: Partial<Bounds>
+  ): Bounds {
+    const containerBounds = {
+      x: (bounds && typeof bounds.x === 'number') ? bounds.x : (rootBounds.x + rootBounds.width + 20),
+      y: (bounds && typeof bounds.y === 'number') ? bounds.y : node.y,
+      width: bounds?.width ?? rootBounds.width,
+      height: bounds?.height ?? rootBounds.height
+    };
+    return containerBounds;
+  }
   
-  public async create(node: SceneNode, text: string | string[] = "请输入交互描述..."): Promise<void> {
+  public async create(
+    node: SceneNode,
+    text: string | string[] = "请输入交互描述...",
+    customBounds?: Partial<Bounds>
+  ): Promise<void> {
     try {
       // 增加计数器
       this.state.annotationCounter++;
@@ -305,11 +327,12 @@ export class TextAnnotation extends BaseAnnotation {
         width: rootNode.width,
         height: rootNode.height
       };
+      const containerBounds = this.getContainerBounds(node, rootBounds, customBounds);
       // 设置初始位置：根节点右侧20px
-      annotationContainer.x = rootBounds.x + rootBounds.width + 20;
-      annotationContainer.y = rootBounds.y;
+      annotationContainer.x = containerBounds.x;
+      annotationContainer.y = containerBounds.y;
       // 检查并避免与现有标注的重叠
-      this.adjustAnnotationPosition(annotationContainer, 'horizontal');
+      this.adjustAnnotationPosition(annotationContainer, 'vertical');
 
       // 创建一个组来包含源标注
       const sourceGroup = figma.group([sourceNumber], figma.currentPage);

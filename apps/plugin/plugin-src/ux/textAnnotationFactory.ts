@@ -6,6 +6,15 @@ type UXInfo = {
   click?: string | null;
 } | string | string[];
 
+export interface UxItem {
+  id: string
+  comments: string[]
+  width: number
+  height: number
+  x: number
+  y: number
+}
+
 const sleep = (ms: number): Promise<void> => {
   return new Promise(resolve => setTimeout(resolve, ms));
 };
@@ -89,7 +98,7 @@ export class TextAnnotationFactory {
    * 在标注之间添加小延迟以防止Figma崩溃
    * @param uxInfoData - 将节点ID映射到其UX信息的记录
    */
-  public async createAnnotationV2(uxInfoData: Record<string, UXInfo>) {
+  public async createAnnotationV2(uxInfoData: Record<string, UxItem>) {
     for (const [nodeId, info] of Object.entries(uxInfoData)) {
       const node = figma.getNodeById(nodeId) as unknown as SceneNode;
       // 异常处理：找不到的节点
@@ -97,10 +106,10 @@ export class TextAnnotationFactory {
         console.warn(`Node with ID ${nodeId} not found`);
         continue;
       }
-
-      await this.textAnnotation.create(node, info as string[]);
+      const { comments, width, height, x, y } = info;
+      await this.textAnnotation.create(node, comments, { width, height, x, y });
       // 每次添加增加一点等待时间，添加太快太多会导致figma崩溃
-      await sleep(50);
+      await sleep(30);
     }
   }
 }

@@ -165,9 +165,9 @@ const CrawlWebModal: React.FC<CrawlWebModalProps> = ({
 
   const handleImportCrawlTaskResult = () => {
     if (!crawlTaskResult) return;
-    const uiJsonContent = crawlTaskResult['merged_ui.json'];
-    const uxJsonContent = crawlTaskResult['merged_ux.json'];
-
+    const uiJsonContent = crawlTaskResult['ui'];
+    const uxJsonContent = crawlTaskResult['ux'];
+    console.log('uiJsonContent', crawlTaskResult);
     // 只发送UI文件内容到插件
     window.parent.postMessage(
       { 

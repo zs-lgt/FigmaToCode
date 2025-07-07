@@ -17,7 +17,7 @@ interface getCrawlTaskStatusResponse {
 }
 
 const CRAWL_API_BASE_URL = 'https://occ.10jqka.com.cn/process_image';
-const DEFAULT_TIMEOUT = 100000;
+const DEFAULT_TIMEOUT = 1000000;
 
 /**
  * 提交爬取任务
@@ -80,7 +80,6 @@ export const getCrawlTaskResultApi = async (task_id: string): Promise<ArrayBuffe
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
-  
   // 检查Content-Type，应该是application/zip或application/octet-stream
   console.log('Content-Type:', response);
   
@@ -93,3 +92,18 @@ export const getCrawlTaskResultApi = async (task_id: string): Promise<ArrayBuffe
     throw new Error(`Unexpected Content-Type: ${contentType}, expected application/zip or application/octet-stream`);
   }
 };
+
+
+export const getCrawlTaskResultApiV2 = async (task_id: string): Promise<{ ui: string, ux: string }> => {
+  const API_BASE_URL = `${CRAWL_API_BASE_URL}/download-result/${task_id}`;
+  const response = await fxios(`${API_BASE_URL}`, {
+    method: 'GET',
+  }, DEFAULT_TIMEOUT);
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data;
+}

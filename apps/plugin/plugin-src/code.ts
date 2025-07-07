@@ -16,7 +16,7 @@ import { exportNodes, getNodeExportImage } from 'backend/src/export';
 import { importFigmaJSON } from 'backend/src/importFigma';
 import { TextAnnotation } from './ux/annotations/text';
 import { Connection } from './ux/connections/connection'
-import { TextAnnotationFactory } from './ux/textAnnotationFactory';
+import { TextAnnotationFactory, UxItem } from './ux/textAnnotationFactory';
 import { Edge, ConnectionFactory } from './ux/connectionFactory';
 import { crawlHtml, getCrawlTaskStatus, getCrawlTaskResult } from './share/crawl';
 
@@ -94,14 +94,16 @@ const safeRun = (settings: PluginSettings) => {
 
 // 从UX数据中提取评论信息，映射到节点ID
 function extractMapsFromUxData(uxData: Ux) {
-  const commentsMap = new Map<string, string[]>();
+  const commentsMap = new Map<string, UxItem>();
   const { description = [] } = uxData
   console.log('uxData', description);
   // 处理UX数据格式：{ nodeId: { comments: string[] } }
   if (description.length) {
     for (const item of description) {
-      const { id, comments } = item;
-      commentsMap.set(id, comments);
+      const { id  } = item;
+      commentsMap.set(id, {
+        ...item,
+      });
     };
   }
   return {
@@ -520,7 +522,8 @@ const standardMode = async () => {
       });
     } else if (msg.type === 'export-selected-nodes') {
       const nodes = figma.currentPage.selection;
-      exportNodes(nodes, msg.optimize, false).then(async nodesData => {
+      
+      exportNodes(nodes, msg.optimize, false, false).then(async nodesData => {
         const { nodesInfo, description, images, optimize } = nodesData;
         const imagesData = [];
         for (const imageId of images) {
@@ -911,15 +914,24 @@ const standardMode = async () => {
     } else if (msg.type === 'import-ui-ux-json') {
       try {
         const { uiJson, uxJson } = msg.data;
-        
+        let uiData: any;
+        let uxData: any;
         if (!uiJson) {
           throw new Error('UI JSON数据不能为空');
         }
-        const uiData = JSON.parse(uiJson);
-        const uxData = JSON.parse(uxJson) as Ux;
+        if (typeof uiJson === 'string') {
+          uiData = JSON.parse(uiJson);
+        } else {
+          uiData = uiJson;
+        }
+        if (typeof uxJson === 'string') {
+          uxData = JSON.parse(uxJson);
+        } else {
+          uxData = uxJson;
+        }
 
         // 解析UX数据
-        let uxCommentsMap: Map<string, string[]> | null = new Map();
+        let uxCommentsMap: Map<string, UxItem> | null = new Map();
         if (uxJson) {
           try {
             const { commentsMap } = extractMapsFromUxData(uxData);
@@ -930,29 +942,28 @@ const standardMode = async () => {
             figma.notify('UX数据格式无效，仅导入UI部分', { error: true });
           }
         }
-
+        console.log('uiData', uiData);
         // 如果uxCommentsMap有数据，则遍历uiData，将comments添加到node的comment属性中
         if (uxCommentsMap.size) {
           for (const uiDataChild of uiData) {
             traverseTree(uiDataChild, (node) => {
-              const comments = uxCommentsMap.get(node.id);
-              if (comments) {
-                console.log('comments', comments);
-                node.comment = comments;
+              const item = uxCommentsMap.get(node.id);
+              if (item) {
+                node.ux = item;
               }
             });
           }
         }
         // 创建一个变量来收集有comment的节点及其ID
-        const nodesWithComments = new Map<string, { node: SceneNode, comment: string[] }>();
+        const nodesWithComments = new Map<string, { node: SceneNode, ux: UxItem }>();
         // 建立一个json id到figma id的映射map
         const nodeIdMap = new Map<string, string>()
         
         // 使用闭包创建一个收集器函数
         const collector = (originalNodeId: string, node: SceneNode, data: any) => {
-          if (data.comment) {
-            console.log('data.comment', data.comment);
-            nodesWithComments.set(node.id, { node, comment: data.comment });
+          if (data.ux) {
+            console.log('data.ux', data.ux);
+            nodesWithComments.set(node.id, { node, ux: data.ux });
           }
           nodeIdMap.set(originalNodeId, node.id)
         };
@@ -966,12 +977,20 @@ const standardMode = async () => {
           if (nodesWithComments.size > 0) {
             try {
               // 准备UX信息数据
-              const uxInfoData: Record<string, string[]> = {};
+              const uxInfoData: Record<string, UxItem> = {};
               console.log('nodesWithComments', nodesWithComments);
+              // collector按照ui节点的遍历顺序打乱了排序，重新按照ux数据的原始顺序排序
+              const { description } = uxData
+              const sortedNodesWithComments = Array.from(nodesWithComments.entries()).sort((a, b) => {
+                const aIndex = description.findIndex((node: any) => node.id === a[1].ux.id);
+                const bIndex = description.findIndex((node: any) => node.id === b[1].ux.id);
+                return aIndex - bIndex;
+              });
+              console.log('sortedNodesWithComments', sortedNodesWithComments);
               // 遍历带comments的节点
-              for (const [nodeId, { node, comment }] of nodesWithComments.entries()) {
+              for (const [nodeId, { node, ux }] of sortedNodesWithComments) {
                 // 直接将所有评论合并为一个字符串作为标注内容
-                uxInfoData[nodeId] = comment;
+                uxInfoData[nodeId] = ux;
               }
               console.log('uxInfoData', uxInfoData);
               // 批量创建文字标注节点
